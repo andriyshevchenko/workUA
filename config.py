@@ -24,9 +24,13 @@ class Config:
     
     # Налаштування бота
     MAX_APPLICATIONS: int = int(os.getenv("MAX_APPLICATIONS", "10"))
-    MAX_VACANCIES: int = int(os.getenv("MAX_VACANCIES", "50"))  # Максимум вакансій для сканування
+    MAX_VACANCIES: int = int(os.getenv("MAX_VACANCIES", "500"))  # Максимум вакансій для сканування (щоб набрати потрібну кількість відгуків)
     USE_LLM: bool = os.getenv("USE_LLM", "false").lower() == "true"
     MIN_SCORE: int = int(os.getenv("MIN_SCORE", "7"))
+    
+    # LLM перевірка перед відгуком
+    USE_PRE_APPLY_LLM_CHECK: bool = os.getenv("USE_PRE_APPLY_LLM_CHECK", "false").lower() == "true"
+    MIN_MATCH_PROBABILITY: int = int(os.getenv("MIN_MATCH_PROBABILITY", "10"))  # Мінімальна ймовірність (%) для відгуку
     
     # Playwright налаштування
     HEADLESS: bool = os.getenv("HEADLESS", "false").lower() == "true"

@@ -176,7 +176,14 @@ class WorkUAScraper:
         
         # Завантажити збережені cookies якщо є
         cookies_loaded = await self.load_cookies()
-        if not cookies_loaded:
+        if cookies_loaded:
+            print("🍪 Cookies завантажено, перевіряю авторизацію...")
+            # Перевіряємо чи cookies ще валідні
+            is_logged_in = await self.check_login_status()
+            if not is_logged_in:
+                print("⚠️ Cookies застаріли, спробую авторизуватись знову...")
+                await self.auto_login()
+        else:
             # Спробувати авторизуватись
             await self.auto_login()
         
@@ -203,6 +210,74 @@ class WorkUAScraper:
             self.is_logged_in = True
             return True
         return False
+    
+    async def analyze_job_match_with_llm(self, job_description: str) -> tuple[int, str]:
+        """Аналіз відповідності вакансії резюме через LLM
+        
+        Returns:
+            tuple[int, str]: (ймовірність прийняття 0-100%, пояснення)
+        """
+        try:
+            # Читаємо резюме
+            if not os.path.exists(config.RESUME_PATH):
+                print("⚠️ Резюме не знайдено")
+                return (50, "Резюме не знайдено для порівняння")
+            
+            with open(config.RESUME_PATH, 'r', encoding='utf-8') as f:
+                resume = f.read()
+            
+            # Промпт для LLM
+            prompt = f"""Проаналізуй наскільки моє резюме підходить для цієї вакансії.
+
+МОЄ РЕЗЮМЕ:
+{resume}
+
+ОПИС ВАКАНСІЇ:
+{job_description}
+
+Дай відповідь у форматі:
+ЙМОВІРНІСТЬ: [число від 0 до 100]%
+ПОЯСНЕННЯ: [коротке пояснення чому саме така ймовірність]
+
+Враховуй:
+- Відповідність навичок і досвіду
+- Відповідність вимог до освіти
+- Відповідність знання мов
+- Чи може досвід компенсувати відсутність формальних вимог
+"""
+            
+            # Викликаємо OpenAI API напряму
+            import openai
+            openai.api_key = config.OPENAI_API_KEY
+            
+            response = openai.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "Ти експерт з підбору персоналу та аналізу резюме."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                max_tokens=500
+            )
+            
+            result = response.choices[0].message.content
+            
+            # Парсимо відповідь
+            import re
+            probability_match = re.search(r'ЙМОВІРНІСТЬ:\s*(\d+)', result)
+            explanation_match = re.search(r'ПОЯСНЕННЯ:\s*(.+)', result, re.DOTALL)
+            
+            if probability_match:
+                probability = int(probability_match.group(1))
+                explanation = explanation_match.group(1).strip() if explanation_match else result
+                return (probability, explanation)
+            else:
+                # Якщо не вдалось розпарсити, повертаємо дефолтні значення
+                return (50, result)
+                
+        except Exception as e:
+            print(f"⚠️ Помилка LLM аналізу: {e}")
+            return (50, f"Помилка аналізу: {e}")
         
     async def check_login_status(self) -> bool:
         """Перевірити чи користувач авторизований"""
@@ -483,14 +558,19 @@ class WorkUAScraper:
                     print(f"✅ Вакансія: {title}")
                     print(f"🔗 URL: {url}")
                     
-                    # Перевірка чи є текст "Вже відгукнулися" на картці (в parent контейнері)
-                    # Піднімаємося від h2 до батьківського generic контейнера вакансії
-                    parent = heading.locator('xpath=ancestor::*[contains(@class, "") or position()=1]/../..').first
-                    page_text = await parent.text_content() if await parent.count() > 0 else ""
-                    if "вже відгукнул" in page_text.lower():
-                        print("⏭️ Вже відгукувались (знайдено на картці) - пропускаю")
-                        self.applied_jobs.add(url)
-                        continue
+                    # Перевірка чи є текст "Вже відгукнулися" біля цього heading
+                    # Шукаємо через батьківський елемент саме цієї вакансії
+                    try:
+                        # Беремо generic контейнер вакансії (2 рівні вгору від heading)
+                        vacancy_card = heading.locator('../..').first
+                        # Шукаємо текст "Вже відгукнулися" всередині цієї картки
+                        already_applied_badge = vacancy_card.get_by_text("Вже відгукнулися", exact=False)
+                        if await already_applied_badge.count() > 0:
+                            print("⏭️ Вже відгукувались (знайдено бейдж) - пропускаю")
+                            self.applied_jobs.add(url)
+                            continue
+                    except Exception as e:
+                        pass  # Якщо не вдалось - продовжуємо
                     
                     # Спрощено - створюємо вакансію з мінімальною інформацією
                     # Деталі завантажимо пізніше при переході на вакансію
@@ -609,50 +689,68 @@ class WorkUAScraper:
         print(f"📤 Відгук на: {job.title}")
         print(f"🔗 URL: {job.url}")
         
-        # Відкриваємо вакансію в новій вкладці
-        new_page = None
+        # Переходимо на вакансію в основній вкладці
         try:
-            print("🆕 Відкриваю нову вкладку...")
-            new_page = await self.context.new_page()
-            await new_page.goto(job.url)
-            await new_page.wait_for_load_state('networkidle')
+            print("🌐 Переходжу на сторінку вакансії...")
+            await self.page.goto(job.url)
+            await self.page.wait_for_load_state('networkidle')
             await HumanBehavior.page_load_delay()
-            print("✅ Вкладка відкрита")
+            print("✅ Сторінка завантажена")
             
             # Перевіряємо чи вже є відгук
             print("🔍 Перевірка чи є відгук...")
             
             # Спочатку шукаємо текст "ви вже відгук" на всій сторінці
-            page_text = await new_page.content()
+            page_text = await self.page.content()
             if "ви вже відгук" in page_text.lower() or "вже відгукнул" in page_text.lower():
                 print("⏭️ Знайдено текст про існуючий відгук - пропускаю")
                 self.applied_jobs.add(job.url)
-                await new_page.close()
                 return False
             
             # Також перевіряємо кнопки
-            already_applied = new_page.locator('button:has-text("Переглянути резюме"), button:has-text("Ви відгукнулись")')
+            already_applied = self.page.locator('button:has-text("Переглянути резюме"), button:has-text("Ви відгукнулись")')
             if await already_applied.count() > 0:
                 print("⏭️ Знайдено кнопку про існуючий відгук - пропускаю")
                 self.applied_jobs.add(job.url)
-                await new_page.close()
                 return False
+            
+            # LLM аналіз перед відгуком (якщо увімкнено)
+            if config.USE_PRE_APPLY_LLM_CHECK:
+                print("🤖 LLM аналіз вакансії...")
+                # Витягуємо весь текст вакансії
+                try:
+                    main_content = self.page.locator('main').first
+                    if await main_content.count() > 0:
+                        job_text = await main_content.text_content()
+                        
+                        # Аналізуємо через LLM
+                        probability, explanation = await self.analyze_job_match_with_llm(job_text)
+                        print(f"📊 Ймовірність прийняття: {probability}%")
+                        print(f"💭 {explanation}")
+                        
+                        if probability < config.MIN_MATCH_PROBABILITY:
+                            print(f"⏭️ Ймовірність ({probability}%) нижче мінімуму ({config.MIN_MATCH_PROBABILITY}%) - пропускаю")
+                            self.applied_jobs.add(job.url)
+                            return False
+                        else:
+                            print(f"✓ Ймовірність достатня - продовжую відгук")
+                except Exception as e:
+                    print(f"⚠️ Помилка LLM аналізу: {e}, продовжую без перевірки")
             
             print("✓ Відгуку немає, можна подавати")
                 
             # Прокрутити до опису як людина читає
             print("📜 Прокручую сторінку...")
-            await HumanBehavior.scroll_page_human_like(new_page, scroll_distance=300)
+            await HumanBehavior.scroll_page_human_like(self.page, scroll_distance=300)
             
             # Рандомна пауза як людина думає чи відгукуватися
             await HumanBehavior.random_delay(1.0, 2.5)
             
             # Клік на кнопку "Відгукнутися"
             print("🖱️ Шукаю кнопку 'Відгукнутися'...")
-            apply_button = new_page.locator('button:has-text("Відгукнутися")').first
+            apply_button = self.page.locator('button:has-text("Відгукнутися")').first
             if await apply_button.count() == 0:
                 print("❌ Не знайдено кнопку 'Відгукнутися'")
-                await new_page.close()
                 return False
             
             # Прокрутити до кнопки
@@ -662,11 +760,11 @@ class WorkUAScraper:
             
             print("🖱️ Клікаю 'Відгукнутися'...")
             await HumanBehavior.click_with_human_behavior(
-                new_page,
+                self.page,
                 'button:has-text("Відгукнутися")',
                 scroll_into_view=True
             )
-            await new_page.wait_for_load_state('networkidle')
+            await self.page.wait_for_load_state('networkidle')
             print("✓ Кнопка натиснута")
             
             # Чекаємо появи dialog/modal з формою
@@ -675,35 +773,34 @@ class WorkUAScraper:
             
             # Перевіряємо чи з'явилось модальне вікно з вибором резюме
             # Якщо користувач залогінений, повинна з'явитись кнопка "Надіслати"
-            send_button = new_page.locator('button:has-text("Надіслати"), button:has-text("Продовжити")')
+            send_button = self.page.locator('button:has-text("Надіслати"), button:has-text("Продовжити")')
             if await send_button.count() == 0:
                 print("⚠️ Не знайдено кнопку відправки резюме")
-                await new_page.close()
                 return False
             
             print("🖱️ Клікаю 'Надіслати'...")
             await send_button.first.click()
-            await new_page.wait_for_load_state('networkidle')
+            await self.page.wait_for_load_state('networkidle')
             print("✓ Резюме відправлено")
             
             # Може з'явитися додатковий діалог про додавання локації
             await HumanBehavior.random_delay(0.5, 1.0)
-            not_add_button = new_page.locator('button:has-text("Не додавати")')
+            not_add_button = self.page.locator('button:has-text("Не додавати")')
             if await not_add_button.count() > 0:
                 print("🖱️ Закриваю діалог локації...")
                 await not_add_button.first.click()
-                await new_page.wait_for_load_state('networkidle')
+                await self.page.wait_for_load_state('networkidle')
             
             # Перевіряємо чи успішно відгукнулись
             await HumanBehavior.random_delay(0.5, 1.0)
             success = False
             
             # Перевіряємо різні ознаки успіху
-            if '/sent/' in new_page.url:
+            if '/sent/' in self.page.url:
                 success = True
-            elif await new_page.locator('text=успішно, text=Дякуємо, text=відгукнулись').count() > 0:
+            elif await self.page.locator('text=успішно, text=Дякуємо, text=відгукнулись').count() > 0:
                 success = True
-            elif await new_page.locator('button:has-text("Переглянути резюме")').count() > 0:
+            elif await self.page.locator('button:has-text("Переглянути резюме")').count() > 0:
                 success = True
             
             if success:
@@ -714,21 +811,10 @@ class WorkUAScraper:
                 # Додаємо все одно - щоб не спробувати ще раз
                 self.applied_jobs.add(job.url)
             
-            # Закриваємо вкладку
-            print("🚪 Закриваю вкладку...")
-            await new_page.close()
-            print("✓ Вкладка закрита\n")
-            
             return success
             
         except Exception as e:
             print(f"❌ Помилка при відгуку: {e}")
-            if new_page:
-                try:
-                    await new_page.close()
-                    print("🚪 Вкладка закрита (після помилки)")
-                except:
-                    pass
             return False
 
 

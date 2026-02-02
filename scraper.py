@@ -574,25 +574,8 @@ class WorkUAScraper:
                     self.logger.debug(f"✅ Вакансія: {title}")
                     self.logger.debug(f"🔗 URL: {url}")
                     
-                    # Перевірка чи є текст "Вже відгукнулися" біля цього heading
-                    # Шукаємо через батьківський елемент саме цієї вакансії
-                    try:
-                        # Беремо generic контейнер вакансії (2 рівні вгору від heading)
-                        vacancy_card = heading.locator('../..').first
-                        # Шукаємо текст "Вже відгукнулися" всередині цієї картки
-                        already_applied_badge = vacancy_card.get_by_text("Вже відгукнулися", exact=False)
-                        badge_count = await already_applied_badge.count()
-                        self.logger.debug(f"🔍 Перевірка бейджа для '{title}': знайдено {badge_count} входжень")
-                        if badge_count > 0:
-                            self.logger.info(f"⏭️ Вже відгукувались на '{title[:50]}...' - пропускаю")
-                            self.applied_jobs.add(url)
-                            continue
-                        else:
-                            self.logger.debug(f"✓ Бейджа 'Вже відгукнулися' немає - додаю")
-                    except Exception as e:
-                        self.logger.warning(f"⚠️ Помилка перевірки бейджа для '{title}': {e}")
-                        # При помилці НЕ пропускаємо вакансію
-                        self.logger.debug(f"✓ Через помилку - додаємо вакансію")
+                    # Перевірку "Вже відгукнулися" перенесено на сторінку вакансії
+                    # Там перевіряємо дату і вирішуємо чи відправляти повторно
                     
                     # Спрощено - створюємо вакансію з мінімальною інформацією
                     # Деталі завантажимо пізніше при переході на вакансію
@@ -700,45 +683,33 @@ class WorkUAScraper:
     async def apply_to_job(self, job: JobListing) -> bool:
         """Відгукнутися на вакансію в новій вкладці"""
         if not self.is_logged_in:
-            print("❌ Неможливо відгукнутись - немає авторизації")
-            return False
-        
-        # Перевірити чи вже не відгукувались на цю вакансію
-        if job.url in self.applied_jobs:
-            print(f"⏭️ Вже відгукувались на цю вакансію раніше - пропускаю")
+            self.logger.warning("❌ Неможливо відгукнутись - немає авторизації")
             return False
             
-        print(f"📤 Відгук на: {job.title}")
-        print(f"🔗 URL: {job.url}")
+        self.logger.info(f"📤 Відгук на: {job.title}")
+        self.logger.info(f"🔗 URL: {job.url}")
         
         # Переходимо на вакансію в основній вкладці
         try:
-            print("🌐 Переходжу на сторінку вакансії...")
+            self.logger.debug("🌐 Переходжу на сторінку вакансії...")
             await self.page.goto(job.url)
             await self.page.wait_for_load_state('networkidle')
             await HumanBehavior.page_load_delay()
-            print("✅ Сторінка завантажена")
+            self.logger.debug("✅ Сторінка завантажена")
             
-            # Перевіряємо чи вже є відгук
-            print("🔍 Перевірка чи є відгук...")
+            # Перевіряємо чи вже є відгук через кнопки
+            self.logger.debug("🔍 Перевірка кнопок відгуку...")
             
-            # Спочатку шукаємо текст "ви вже відгук" на всій сторінці
-            page_text = await self.page.content()
-            if "ви вже відгук" in page_text.lower() or "вже відгукнул" in page_text.lower():
-                print("⏭️ Знайдено текст про існуючий відгук - пропускаю")
-                self.applied_jobs.add(job.url)
-                return False
-            
-            # Також перевіряємо кнопки
+            # Перевіряємо кнопки
             already_applied = self.page.locator('button:has-text("Переглянути резюме"), button:has-text("Ви відгукнулись")')
             if await already_applied.count() > 0:
-                print("⏭️ Знайдено кнопку про існуючий відгук - пропускаю")
+                self.logger.debug("⏭️ Знайдено кнопку про існуючий відгук - пропускаю")
                 self.applied_jobs.add(job.url)
                 return False
             
             # LLM аналіз перед відгуком (якщо увімкнено)
             if config.USE_PRE_APPLY_LLM_CHECK:
-                print("🤖 LLM аналіз вакансії...")
+                self.logger.debug("🤖 LLM аналіз вакансії...")
                 # Витягуємо весь текст вакансії
                 try:
                     main_content = self.page.locator('main').first
@@ -747,69 +718,100 @@ class WorkUAScraper:
                         
                         # Аналізуємо через LLM
                         probability, explanation = await self.analyze_job_match_with_llm(job_text)
-                        print(f"📊 Ймовірність прийняття: {probability}%")
-                        print(f"💭 {explanation}")
+                        self.logger.debug(f"📊 Ймовірність прийняття: {probability}%")
+                        self.logger.debug(f"💭 {explanation}")
                         
                         if probability < config.MIN_MATCH_PROBABILITY:
-                            print(f"⏭️ Ймовірність ({probability}%) нижче мінімуму ({config.MIN_MATCH_PROBABILITY}%) - пропускаю")
+                            self.logger.debug(f"⏭️ Ймовірність ({probability}%) нижче мінімуму ({config.MIN_MATCH_PROBABILITY}%) - пропускаю")
                             self.applied_jobs.add(job.url)
                             return False
                         else:
-                            print(f"✓ Ймовірність достатня - продовжую відгук")
+                            self.logger.debug(f"✓ Ймовірність достатня - продовжую відгук")
                 except Exception as e:
-                    print(f"⚠️ Помилка LLM аналізу: {e}, продовжую без перевірки")
+                    self.logger.debug(f"⚠️ Помилка LLM аналізу: {e}, продовжую без перевірки")
             
-            print("✓ Відгуку немає, можна подавати")
+            # Перевіряємо чи вже відгукувалися і чи минув термін для повторного відгуку
+            already_sent = self.page.locator('[class*="already-sent"], [id*="already-sent"]')
+            if await already_sent.count() > 0:
+                try:
+                    text = await already_sent.first.text_content()
+                    self.logger.debug(f"📅 Знайдено: {text}")
+                    
+                    # Парсимо дату з формату "Ви вже відгукалися на цю вакансію DD.MM.YYYY"
+                    import re
+                    from datetime import datetime
+                    
+                    date_match = re.search(r'(\d{2})\.(\d{2})\.(\d{4})', text)
+                    if date_match:
+                        day, month, year = date_match.groups()
+                        applied_date = datetime(int(year), int(month), int(day))
+                        now = datetime.now()
+                        months_passed = (now.year - applied_date.year) * 12 + (now.month - applied_date.month)
+                        
+                        self.logger.debug(f"📆 Дата відгуку: {applied_date.strftime('%d.%m.%Y')} (минуло {months_passed} міс.)")
+                        
+                        if months_passed < config.REAPPLY_AFTER_MONTHS:
+                            self.logger.debug(f"⏭️ Відгукувались {months_passed} міс. тому (потрібно {config.REAPPLY_AFTER_MONTHS}+) - пропускаю")
+                            self.applied_jobs.add(job.url)
+                            return False
+                        else:
+                            self.logger.debug(f"🔄 Минуло {months_passed} міс. - відправляємо повторно")
+                    else:
+                        self.logger.debug("⚠️ Не вдалось розпарсити дату, продовжую")
+                except Exception as e:
+                    self.logger.debug(f"⚠️ Помилка перевірки already-sent: {e}, продовжую")
+            
+            self.logger.debug("✓ Відгуку немає, можна подавати")
                 
             # Прокрутити до опису як людина читає
-            print("📜 Прокручую сторінку...")
+            self.logger.debug("📜 Прокручую сторінку...")
             await HumanBehavior.scroll_page_human_like(self.page, scroll_distance=300)
             
             # Рандомна пауза як людина думає чи відгукуватися
             await HumanBehavior.random_delay(1.0, 2.5)
             
             # Клік на кнопку "Відгукнутися"
-            print("🖱️ Шукаю кнопку 'Відгукнутися'...")
+            self.logger.debug("🖱️ Шукаю кнопку 'Відгукнутися'...")
             apply_button = self.page.locator('button:has-text("Відгукнутися")').first
             if await apply_button.count() == 0:
-                print("❌ Не знайдено кнопку 'Відгукнутися'")
+                self.logger.debug("❌ Не знайдено кнопку 'Відгукнутися'")
                 return False
             
             # Прокрутити до кнопки
-            print("📜 Прокручую до кнопки...")
+            self.logger.debug("📜 Прокручую до кнопки...")
             await apply_button.scroll_into_view_if_needed()
             await HumanBehavior.random_delay(0.5, 1.0)
             
-            print("🖱️ Клікаю 'Відгукнутися'...")
+            self.logger.debug("🖱️ Клікаю 'Відгукнутися'...")
             await HumanBehavior.click_with_human_behavior(
                 self.page,
                 'button:has-text("Відгукнутися")',
                 scroll_into_view=True
             )
             await self.page.wait_for_load_state('networkidle')
-            print("✓ Кнопка натиснута")
+            self.logger.debug("✓ Кнопка натиснута")
             
             # Чекаємо появи dialog/modal з формою
-            print("⏳ Чекаю модальне вікно...")
+            self.logger.debug("⏳ Чекаю модальне вікно...")
             await HumanBehavior.random_delay(0.8, 1.5)
             
             # Перевіряємо чи з'явилось модальне вікно з вибором резюме
             # Якщо користувач залогінений, повинна з'явитись кнопка "Надіслати"
             send_button = self.page.locator('button:has-text("Надіслати"), button:has-text("Продовжити")')
             if await send_button.count() == 0:
-                print("⚠️ Не знайдено кнопку відправки резюме")
+                self.logger.debug("⚠️ Не знайдено кнопку відправки резюме")
                 return False
             
-            print("🖱️ Клікаю 'Надіслати'...")
+            self.logger.debug("🖱️ Клікаю 'Надіслати'...")
             await send_button.first.click()
             await self.page.wait_for_load_state('networkidle')
-            print("✓ Резюме відправлено")
+            self.logger.debug("✓ Резюме відправлено")
             
             # Може з'явитися додатковий діалог про додавання локації
             await HumanBehavior.random_delay(0.5, 1.0)
             not_add_button = self.page.locator('button:has-text("Не додавати")')
             if await not_add_button.count() > 0:
-                print("🖱️ Закриваю діалог локації...")
+                self.logger.debug("🖱️ Закриваю діалог локації...")
                 await not_add_button.first.click()
                 await self.page.wait_for_load_state('networkidle')
             
@@ -826,17 +828,17 @@ class WorkUAScraper:
                 success = True
             
             if success:
-                print(f"✅ Успішно відгукнулись на: {job.title}")
+                self.logger.debug(f"✅ Успішно відгукнулись на: {job.title}")
                 self.applied_jobs.add(job.url)  # Додаємо до списку
             else:
-                print(f"⚠️ Невідомий статус відгуку (можливо, все ок)")
+                self.logger.debug(f"⚠️ Невідомий статус відгуку (можливо, все ок)")
                 # Додаємо все одно - щоб не спробувати ще раз
                 self.applied_jobs.add(job.url)
             
             return success
             
         except Exception as e:
-            print(f"❌ Помилка при відгуку: {e}")
+            self.logger.error(f"❌ Помилка при відгуку: {e}")
             return False
 
 

@@ -172,7 +172,7 @@ class WorkUABot:
         remote_only = config.REMOTE_ONLY
         locations = config.LOCATIONS if not remote_only else []
         
-        self.logger.info(f"🔍 Ключові слова: {', '.join(keywords)}")
+        self.logger.info(f"🔍 Ключові слова ({len(keywords)}): {', '.join(keywords)}")
         if remote_only:
             self.logger.info("🌍 Режим: Тільки дистанційна робота")
         else:
@@ -184,92 +184,93 @@ class WorkUABot:
         total_scanned = 0
         total_applied = 0
         total_skipped = 0
-        page = 1
         max_vacancies = config.MAX_VACANCIES
+        
+        # Розраховуємо скільки сторінок потрібно (припускаємо ~20 вакансій на сторінку)
+        estimated_pages_needed = (max_applications // 15) + 2  # +2 для запасу
+        max_pages_to_scan = min(estimated_pages_needed, 20)  # Не більше 20 сторінок
         
         try:
             # Сканування вакансій
-            for keyword in keywords:
-                if total_applied >= max_applications or total_scanned >= max_vacancies:
+            for keyword_idx, keyword in enumerate(keywords, 1):
+                if total_applied >= max_applications:
+                    self.logger.info(f"🎯 Досягнуто мету: {total_applied} відгуків")
                     break
                 
-                self.logger.info(f"\n🔎 Пошук за ключовим словом: '{keyword}'")
+                self.logger.info(f"\n{'='*70}")
+                self.logger.info(f"🔎 Пошук за ключовим словом [{keyword_idx}/{len(keywords)}]: '{keyword}'")
+                self.logger.info(f"📊 Прогрес: {total_applied}/{max_applications} відгуків")
+                self.logger.info(f"{'='*70}")
                 
-                # Пошук з pagination
-                while total_applied < max_applications and total_scanned < max_vacancies:
-                    self.logger.info(f"\n📄 Сторінка {page}")
-                    
-                    # Отримати вакансії
-                    if remote_only:
-                        jobs = await self.scraper.search_jobs(
+                # Отримати всі вакансії (scraper сам пройде по сторінках)
+                if remote_only:
+                    jobs = await self.scraper.search_jobs(
+                        keyword=keyword,
+                        remote=True,
+                        max_pages=max_pages_to_scan
+                    )
+                else:
+                    all_jobs = []
+                    for location in locations:
+                        jobs_in_loc = await self.scraper.search_jobs(
                             keyword=keyword,
-                            remote=True,
-                            max_pages=1
+                            location=location,
+                            max_pages=max_pages_to_scan
                         )
-                    else:
-                        all_jobs = []
-                        for location in locations:
-                            jobs_in_loc = await self.scraper.search_jobs(
-                                keyword=keyword,
-                                location=location,
-                                max_pages=1
-                            )
-                            all_jobs.extend(jobs_in_loc)
-                        jobs = all_jobs
-                    
-                    if not jobs:
-                        self.logger.warning("⚠️ Більше вакансій не знайдено")
+                        all_jobs.extend(jobs_in_loc)
+                    jobs = all_jobs
+                
+                if not jobs:
+                    self.logger.warning("⚠️ Вакансій не знайдено")
+                    continue
+                
+                self.logger.info(f"📋 Знайдено {len(jobs)} вакансій загалом")
+                
+                # Обробка кожної вакансії
+                for idx, job in enumerate(jobs, 1):
+                    if total_applied >= max_applications:
+                        self.logger.info(f"🎯 Досягнуто мету: {total_applied}/{max_applications} відгуків")
                         break
                     
-                    self.logger.info(f"📋 Знайдено {len(jobs)} вакансій на сторінці")
+                    if total_scanned >= max_vacancies:
+                        self.logger.warning(f"⚠️ Досягнуто ліміт перегляду: {max_vacancies} вакансій")
+                        break
                     
-                    # Обробка кожної вакансії
-                    for idx, job in enumerate(jobs, 1):
-                        if total_applied >= max_applications or total_scanned >= max_vacancies:
-                            break
-                        
-                        total_scanned += 1
-                        self.logger.info(f"\n--- Вакансія {idx}/{len(jobs)} (Всього оброблено: {total_scanned}) ---")
-                        self.logger.info(f"📌 {job.title}")
-                        self.logger.info(f"🏢 {job.company}")
-                        self.logger.info(f"📍 {job.location}")
-                        if job.salary:
-                            self.logger.info(f"💰 {job.salary}")
-                        
-                        # Аналіз через LLM (якщо увімкнено) - без деталей, бо відгукуємось одразу
-                        should_apply, score, reason = self.analyze_job(job)
-                        
-                        if self.use_llm:
-                            self.logger.info(f"🤖 LLM оцінка: {score}/10")
-                            self.logger.info(f"💭 Причина: {reason}")
-                        
-                        if should_apply:
-                            # Спроба відгукнутись
-                            try:
-                                success = await self.scraper.apply_to_job(job)
-                                if success:
-                                    total_applied += 1
-                                    self.logger.info(f"✅ Відгукнулись! ({total_applied}/{max_applications})")
-                                else:
-                                    total_skipped += 1
-                                    self.logger.warning("⚠️ Не вдалось відгукнутись")
-                                
-                                # Пауза між відгуками
-                                await asyncio.sleep(2)
-                                
-                            except Exception as e:
-                                self.logger.error(f"❌ Помилка відгуку: {e}")
+                    total_scanned += 1
+                    self.logger.info(f"\n--- Вакансія {idx}/{len(jobs)} (Всього оброблено: {total_scanned}) ---")
+                    self.logger.info(f"📌 {job.title}")
+                    self.logger.info(f"🏢 {job.company}")
+                    self.logger.info(f"📍 {job.location}")
+                    if job.salary:
+                        self.logger.info(f"💰 {job.salary}")
+                    
+                    # Аналіз через LLM (якщо увімкнено) - без деталей, бо відгукуємось одразу
+                    should_apply, score, reason = self.analyze_job(job)
+                    
+                    if self.use_llm:
+                        self.logger.info(f"🤖 LLM оцінка: {score}/10")
+                        self.logger.info(f"💭 Причина: {reason}")
+                    
+                    if should_apply:
+                        # Спроба відгукнутись
+                        try:
+                            success = await self.scraper.apply_to_job(job)
+                            if success:
+                                total_applied += 1
+                                self.logger.info(f"✅ Відгукнулись! ({total_applied}/{max_applications})")
+                            else:
                                 total_skipped += 1
-                        else:
+                                self.logger.warning("⚠️ Не вдалось відгукнутись")
+                            
+                            # Пауза між відгуками
+                            await asyncio.sleep(2)
+                            
+                        except Exception as e:
+                            self.logger.error(f"❌ Помилка відгуку: {e}")
                             total_skipped += 1
-                            self.logger.info(f"⏭️ Пропускаємо (оцінка {score} < мінімум)")
-                    
-                    # Перехід на наступну сторінку
-                    if total_applied < max_applications:
-                        page += 1
-                        # TODO: Реалізувати перехід на наступну сторінку в scraper
-                        # Поки що - виходимо
-                        break
+                    else:
+                        total_skipped += 1
+                        self.logger.info(f"⏭️ Пропускаємо (оцінка {score} < мінімум)")
         
         finally:
             # Фінальна статистика

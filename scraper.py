@@ -7,6 +7,7 @@ from typing import Optional, List, Dict
 from dataclasses import dataclass
 from config import config
 from human_behavior import HumanBehavior
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse, quote_plus
 import json
 import os
 
@@ -406,7 +407,6 @@ class WorkUAScraper:
                 if remote:
                     # Для remote вакансій використовуємо прямий URL з encoded keywords
                     # Формат: jobs-remote-keyword/ де ключові слова розділені +
-                    from urllib.parse import quote_plus
                     # Замінити коми та пробіли на +
                     encoded_keyword = keyword.replace(',', '+').replace(' ', '+')
                     search_url = f'https://www.work.ua/jobs-remote-{encoded_keyword}/'
@@ -485,13 +485,22 @@ class WorkUAScraper:
                     await self.page.wait_for_load_state('networkidle')
                     await HumanBehavior.page_load_delay()
             else:
-                # Наступні сторінки - формуємо URL
+                # Наступні сторінки - формуємо URL зберігаючи всі параметри
+                from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
                 current_url = self.page.url
-                if '?page=' in current_url:
-                    url = current_url.rsplit('?page=', 1)[0] + f'?page={page_num}'
-                else:
-                    separator = '&' if '?' in current_url else '?'
-                    url = current_url + f'{separator}page={page_num}'
+                parsed = urlparse(current_url)
+                
+                # Отримуємо всі параметри
+                params = parse_qs(parsed.query)
+                # Оновлюємо/додаємо page
+                params['page'] = [str(page_num)]
+                
+                # Відновлюємо URL з оновленими параметрами
+                new_query = urlencode(params, doseq=True)
+                new_parsed = parsed._replace(query=new_query)
+                url = urlunparse(new_parsed)
+                
+                print(f"📄 Перехід на сторінку {page_num}: {url}")
                 await self.page.goto(url)
                 await self.page.wait_for_load_state('networkidle')
                 await HumanBehavior.page_load_delay()

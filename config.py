@@ -17,8 +17,8 @@ class Config:
     
     # Налаштування пошуку
     RESUME_PATH: str = os.getenv("RESUME_PATH", "./my_resume.pdf")
-    SEARCH_KEYWORDS: list[str] = os.getenv("SEARCH_KEYWORDS", "python developer").split(",")
-    LOCATIONS: list[str] = os.getenv("LOCATIONS", "Київ").split(",")
+    SEARCH_KEYWORDS: list[str] = [kw.strip() for kw in os.getenv("SEARCH_KEYWORDS", "python developer").split(",") if kw.strip()]
+    LOCATIONS: list[str] = [loc.strip() for loc in os.getenv("LOCATIONS", "Київ").split(",") if loc.strip()]
     REMOTE_ONLY: bool = os.getenv("REMOTE_ONLY", "false").lower() == "true"
     MIN_SALARY: int = int(os.getenv("MIN_SALARY", "0"))  # 0=без фільтра, 2=10k, 3=15k, 4=20k, 5=30k, 6=40k, 7=50k, 8=100k
     

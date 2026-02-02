@@ -42,6 +42,10 @@ class WorkUAScraper:
         self.is_logged_in = False
         self.applied_jobs = set()  # Множина URL вакансій на які вже відгукнулись
         
+        # Ініціалізація логера
+        import logging
+        self.logger = logging.getLogger(__name__)
+        
     async def start(self, headless: bool = False):
         """Запустити браузер з stealth режимом та реалістичними налаштуваннями"""
         self.playwright = await async_playwright().start()
@@ -388,7 +392,8 @@ class WorkUAScraper:
         keyword: str,
         location: Optional[str] = None,
         max_pages: int = 3,
-        remote: bool = False
+        remote: bool = False,
+        target_jobs: Optional[int] = None
     ) -> List[JobListing]:
         """Пошук вакансій за ключовим словом з людиноподібною поведінкою
         
@@ -397,18 +402,21 @@ class WorkUAScraper:
             location: Місто або "Дистанційно" (опціонально)
             max_pages: Максимальна кількість сторінок для парсингу
             remote: True якщо шукаємо тільки дистанційну роботу
+            target_jobs: Ціль кількості вакансій (зупинимось коли досягнемо)
         """
         jobs = []
+        self.logger.info(f"� Пошук за запитом: {keyword}")
+        self.logger.info(f"�🔄 Початок сканування до {max_pages} сторінок...")
         
         for page_num in range(1, max_pages + 1):
+            self.logger.info(f"📄 Обробка сторінки {page_num}/{max_pages}...")
             # Переходимо на сторінку пошуку
             if page_num == 1:
                 # Перша сторінка
                 if remote:
-                    # Для remote вакансій використовуємо прямий URL з encoded keywords
-                    # Формат: jobs-remote-keyword/ де ключові слова розділені +
-                    # Замінити коми та пробіли на +
-                    encoded_keyword = keyword.replace(',', '+').replace(' ', '+')
+                    # Для remote вакансій використовуємо прямий URL
+                    # Work.ua очікує пробіли замінені на плюс: jobs-remote-менеджер+з+продажу/
+                    encoded_keyword = keyword.strip().replace(' ', '+')
                     search_url = f'https://www.work.ua/jobs-remote-{encoded_keyword}/'
                     
                     # Додаємо фільтр мінімальної зарплати якщо вказано
@@ -485,20 +493,15 @@ class WorkUAScraper:
                     await self.page.wait_for_load_state('networkidle')
                     await HumanBehavior.page_load_delay()
             else:
-                # Наступні сторінки - формуємо URL зберігаючи всі параметри
-                from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
-                current_url = self.page.url
-                parsed = urlparse(current_url)
+                # Наступні сторінки - додаємо ?page=N або &page=N
+                current_url = self.page.url.split('?')[0]  # Базовий URL без параметрів
                 
-                # Отримуємо всі параметри
-                params = parse_qs(parsed.query)
-                # Оновлюємо/додаємо page
-                params['page'] = [str(page_num)]
-                
-                # Відновлюємо URL з оновленими параметрами
-                new_query = urlencode(params, doseq=True)
-                new_parsed = parsed._replace(query=new_query)
-                url = urlunparse(new_parsed)
+                # Перевіряємо чи є salaryfrom в оригінальному URL
+                if '?salaryfrom=' in self.page.url:
+                    salary = self.page.url.split('?salaryfrom=')[1].split('&')[0]
+                    url = f"{current_url}?salaryfrom={salary}&page={page_num}"
+                else:
+                    url = f"{current_url}?page={page_num}"
                 
                 print(f"📄 Перехід на сторінку {page_num}: {url}")
                 await self.page.goto(url)
@@ -516,34 +519,38 @@ class WorkUAScraper:
             await HumanBehavior.scroll_page_human_like(self.page, scroll_distance=500)
             
             # Парсимо вакансії на сторінці
-            print(f"🔎 Початок парсингу вакансій...")
+            self.logger.info(f"🔎 Парсинг вакансій на сторінці {page_num}...")
             page_jobs = await self._parse_search_results()
-            jobs.extend(page_jobs)
             
-            print(f"✓ Знайдено {len(page_jobs)} вакансій на сторінці {page_num}")
+            # Додаємо знайдені вакансії (навіть якщо 0 - продовжуємо далі)
+            if page_jobs:
+                jobs.extend(page_jobs)
+                self.logger.info(f"✅ Знайдено {len(page_jobs)} вакансій на сторінці {page_num}. Всього: {len(jobs)}")
+            else:
+                self.logger.info(f"⚠️ Сторінка {page_num}: 0 нових вакансій (всі вже переглянуті). Продовжуємо далі...")
             
-            # Перевірка чи є наступна сторінка
-            has_next = await self._has_next_page()
-            if not has_next:
-                print("ℹ️ Досягнуто останньої сторінки результатів")
+            # Перевірка чи досягли цілі
+            if target_jobs and len(jobs) >= target_jobs:
+                self.logger.info(f"🎯 Досягнуто мету: {len(jobs)}/{target_jobs} вакансій. Зупиняємо сканування.")
                 break
             
             # Пауза між сторінками як людина
             await HumanBehavior.random_delay(2.0, 4.0)
-            
+        
+        self.logger.info(f"🏁 Сканування завершено. Знайдено {len(jobs)} вакансій на {page_num} сторінках")
         return jobs
         
     async def _parse_search_results(self) -> List[JobListing]:
         """Парсинг результатів пошуку"""
-        print(f"📋 Початок _parse_search_results()")
+        self.logger.debug(f"📋 Початок _parse_search_results()")
         jobs = []
         
         # Використовуємо role selector для заголовків level=2 (це вакансії)
         try:
             # Всі заголовки h2 на сторінці - це вакансії
-            print(f"🔍 Пошук заголовків h2 (role=heading, level=2)...")
+            self.logger.debug(f"🔍 Пошук заголовків h2 (role=heading, level=2)...")
             job_headings = await self.page.get_by_role('heading', level=2).all()
-            print(f"✅ Знайдено {len(job_headings)} заголовків h2")
+            self.logger.info(f"📊 Знайдено {len(job_headings)} заголовків h2 на сторінці")
             
             for idx, heading in enumerate(job_headings, 1):
                 try:
@@ -564,8 +571,8 @@ class WorkUAScraper:
                         url = config.WORKUA_BASE_URL + url
                     
                     title = await link.text_content()
-                    print(f"✅ Вакансія: {title}")
-                    print(f"🔗 URL: {url}")
+                    self.logger.debug(f"✅ Вакансія: {title}")
+                    self.logger.debug(f"🔗 URL: {url}")
                     
                     # Перевірка чи є текст "Вже відгукнулися" біля цього heading
                     # Шукаємо через батьківський елемент саме цієї вакансії
@@ -574,12 +581,18 @@ class WorkUAScraper:
                         vacancy_card = heading.locator('../..').first
                         # Шукаємо текст "Вже відгукнулися" всередині цієї картки
                         already_applied_badge = vacancy_card.get_by_text("Вже відгукнулися", exact=False)
-                        if await already_applied_badge.count() > 0:
-                            print("⏭️ Вже відгукувались (знайдено бейдж) - пропускаю")
+                        badge_count = await already_applied_badge.count()
+                        self.logger.debug(f"🔍 Перевірка бейджа для '{title}': знайдено {badge_count} входжень")
+                        if badge_count > 0:
+                            self.logger.info(f"⏭️ Вже відгукувались на '{title[:50]}...' - пропускаю")
                             self.applied_jobs.add(url)
                             continue
+                        else:
+                            self.logger.debug(f"✓ Бейджа 'Вже відгукнулися' немає - додаю")
                     except Exception as e:
-                        pass  # Якщо не вдалось - продовжуємо
+                        self.logger.warning(f"⚠️ Помилка перевірки бейджа для '{title}': {e}")
+                        # При помилці НЕ пропускаємо вакансію
+                        self.logger.debug(f"✓ Через помилку - додаємо вакансію")
                     
                     # Спрощено - створюємо вакансію з мінімальною інформацією
                     # Деталі завантажимо пізніше при переході на вакансію

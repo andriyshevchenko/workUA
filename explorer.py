@@ -155,30 +155,6 @@ class WorkUAExplorer:
                 await self.save_cookies()
                 return True
             return False
-        print("\n=== ДОСЛІДЖЕННЯ СТОРІНКИ ЛОГІНУ ===")
-        await self.page.goto(config.WORKUA_LOGIN_URL)
-        await self.page.wait_for_load_state('networkidle')
-        
-        await self.page.screenshot(path='screenshots/login_page.png', full_page=True)
-        print("✓ Скріншот сторінки логіну збережено")
-        
-        # Знайти поля для входу
-        email_field = await self.page.query_selector('input[type="email"], input[name*="email"], input[name*="login"]')
-        password_field = await self.page.query_selector('input[type="password"]')
-        submit_button = await self.page.query_selector('button[type="submit"], input[type="submit"]')
-        
-        if email_field:
-            email_name = await email_field.get_attribute('name')
-            print(f"✓ Поле email: name='{email_name}'")
-        if password_field:
-            pass_name = await password_field.get_attribute('name')
-            print(f"✓ Поле пароля: name='{pass_name}'")
-        if submit_button:
-            submit_text = await submit_button.text_content()
-            print(f"✓ Кнопка входу: '{submit_text.strip() if submit_text else 'Submit'}'")
-            
-        print("\n⚠️ Браузер відкритий - ви можете авторизуватись вручну")
-        print("Після авторизації натисніть Enter в консолі...")
         
     async def manual_login_wait(self):
         """Чекати на ручну авторизацію користувача"""

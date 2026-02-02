@@ -706,8 +706,8 @@ class WorkUAScraper:
         # Переходимо на вакансію в основній вкладці
         try:
             self.logger.debug("🌐 Переходжу на сторінку вакансії...")
-            await self.page.goto(job.url)
-            await self.page.wait_for_load_state('networkidle')
+            await self.page.goto(job.url, timeout=60000)  # Збільшено до 60 секунд
+            await self.page.wait_for_load_state('networkidle', timeout=30000)
             await HumanBehavior.page_load_delay()
             self.logger.debug("✅ Сторінка завантажена")
             

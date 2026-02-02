@@ -236,10 +236,11 @@ class WorkUABot:
                     break
                 
                 total_scanned += 1
-                self.logger.info(f"\n--- Вакансія {idx}/{len(jobs)} (Всього оброблено: {total_scanned}) ---")
+                self.logger.info("")
+                self.logger.info(f"--- Вакансія {idx}/{len(jobs)} (Всього оброблено: {total_scanned}) ---")
                 self.logger.info(f"📌 {job.title}")
-                self.logger.info(f"🏢 {job.company}")
-                self.logger.info(f"📍 {job.location}")
+                self.logger.info(f"🏢 {job.company if job.company else '(не вказано)'}")
+                self.logger.info(f"📍 {job.location if job.location else '(не вказано)'}")
                 if job.salary:
                     self.logger.info(f"💰 {job.salary}")
                 

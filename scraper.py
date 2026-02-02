@@ -660,9 +660,6 @@ class WorkUAScraper:
         await self.page.wait_for_load_state('networkidle')
         await HumanBehavior.page_load_delay()
         
-        # Прокрутити сторінку як людина читає
-        await HumanBehavior.scroll_page_human_like(self.page, scroll_distance=400)
-        
         # Опис вакансії - знаходиться в секції з заголовком "Опис вакансії"
         try:
             # Шукаємо заголовок "Опис вакансії"
@@ -778,7 +775,7 @@ class WorkUAScraper:
             
             self.logger.debug("✓ Перевірки пройдені, можна подавати")
                 
-            # Прокрутити до опису як людина читає
+            # Прокрутити сторінку вниз щоб завантажити всі елементи
             self.logger.debug("📜 Прокручую сторінку...")
             await HumanBehavior.scroll_page_human_like(self.page, scroll_distance=300)
             
@@ -800,14 +797,32 @@ class WorkUAScraper:
                 else:
                     self.logger.debug("✓ Знайдено кнопку 'Переглянути резюме' - це повторний відгук")
             
-            # Прокрутити до кнопки
+            # Прокрутити до кнопки щоб вона стала видимою
             self.logger.debug("📜 Прокручую до кнопки...")
-            await apply_button.scroll_into_view_if_needed()
+            try:
+                await apply_button.scroll_into_view_if_needed(timeout=10000)
+            except Exception as e:
+                self.logger.debug(f"⚠️ Помилка прокрутки: {e}, пробую без прокрутки")
+            
+            # Пауза перед кліком
             await HumanBehavior.random_delay(0.5, 1.0)
             
             self.logger.debug("🖱️ Клікаю кнопку...")
-            await apply_button.click()
-            await self.page.wait_for_load_state('networkidle')
+            try:
+                # Спочатку пробуємо звичайний клік з очікуванням видимості
+                await apply_button.click(timeout=15000)
+            except Exception as e:
+                self.logger.debug(f"⚠️ Звичайний клік не вдався: {e}")
+                try:
+                    # Якщо не вдалось - force click (клік навіть якщо не видимий)
+                    self.logger.debug("🔄 Пробую force click...")
+                    await apply_button.click(force=True, timeout=5000)
+                except Exception as e2:
+                    self.logger.debug(f"❌ Force click теж не вдався: {e2}")
+                    # Якщо обидва кліки не вдались - пропускаємо вакансію
+                    return False
+            
+            await self.page.wait_for_load_state('networkidle', timeout=30000)
             self.logger.debug("✓ Кнопка натиснута")
             
             # Чекаємо появи dialog/modal з формою
@@ -866,15 +881,7 @@ class WorkUAScraper:
                 self.db.add_or_update(job.url, today, job.title, job.company)
                 self.logger.debug(f"💾 Збережено в БД: {today}")
             else:
-                self.logger.debug(f"⚠️ Невідомий статус відгуку (можливо, все ок)")
-                # Додаємо все одно - щоб не спробувати ще раз
-                self.applied_jobs.add(job.url)
-                
-                # Також оновлюємо БД
-                from datetime import datetime
-                today = datetime.now().strftime('%Y-%m-%d')
-                self.db.add_or_update(job.url, today, job.title, job.company)
-                self.logger.debug(f"💾 Збережено в БД: {today}")
+                self.logger.debug(f"⚠️ Невідомий статус відгуку - НЕ оновлюю БД")
             
             return success
             

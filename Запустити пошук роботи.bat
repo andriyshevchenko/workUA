@@ -1,8 +1,3 @@
 @echo off
-chcp 65001 >nul
 cd /d "%~dp0"
-echo Поточна директорія: %CD%
-echo.
-echo Запуск бота...
-uv run python bot.py
-pause
+powershell.exe -NoExit -ExecutionPolicy Bypass -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Write-Host 'Поточна директорія:' $PWD -ForegroundColor Cyan; Write-Host ''; Write-Host 'Запуск бота...' -ForegroundColor Green; & uv run python bot.py; Write-Host ''; Write-Host 'Завершено.' -ForegroundColor Yellow"

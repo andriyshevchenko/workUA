@@ -10,6 +10,7 @@ from human_behavior import HumanBehavior
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse, quote_plus
 import json
 import os
+from database import VacancyDatabase
 
 
 @dataclass
@@ -41,6 +42,7 @@ class WorkUAScraper:
         self.context = None
         self.is_logged_in = False
         self.applied_jobs = set()  # Множина URL вакансій на які вже відгукнулись
+        self.db = VacancyDatabase()  # База даних відгуків
         
         # Ініціалізація логера
         import logging
@@ -574,8 +576,12 @@ class WorkUAScraper:
                     self.logger.debug(f"✅ Вакансія: {title}")
                     self.logger.debug(f"🔗 URL: {url}")
                     
-                    # Перевірку "Вже відгукнулися" перенесено на сторінку вакансії
-                    # Там перевіряємо дату і вирішуємо чи відправляти повторно
+                    # ПЕРЕВІРКА БД перед додаванням в список
+                    self.logger.debug(f"🗄️ Перевіряю БД для {url[:50]}...")
+                    if not self.db.should_reapply(url, config.REAPPLY_AFTER_MONTHS):
+                        months = self.db.get_months_since_application(url)
+                        self.logger.debug(f"⏭️ БД: Відгукувались {months} міс. тому - ПРОПУСКАЮ при зборі")
+                        continue
                     
                     # Спрощено - створюємо вакансію з мінімальною інформацією
                     # Деталі завантажимо пізніше при переході на вакансію
@@ -689,6 +695,14 @@ class WorkUAScraper:
         self.logger.info(f"📤 Відгук на: {job.title}")
         self.logger.info(f"🔗 URL: {job.url}")
         
+        # ПЕРЕВІРКА 1: База даних - чи вже відгукувались і чи пройшов термін
+        self.logger.debug("🗄️ Перевіряю базу даних...")
+        if not self.db.should_reapply(job.url, config.REAPPLY_AFTER_MONTHS):
+            months = self.db.get_months_since_application(job.url)
+            self.logger.debug(f"⏭️ БД: Відгукувались {months} міс. тому (потрібно {config.REAPPLY_AFTER_MONTHS}+) - пропускаю")
+            self.applied_jobs.add(job.url)
+            return False
+        
         # Переходимо на вакансію в основній вкладці
         try:
             self.logger.debug("🌐 Переходжу на сторінку вакансії...")
@@ -697,8 +711,8 @@ class WorkUAScraper:
             await HumanBehavior.page_load_delay()
             self.logger.debug("✅ Сторінка завантажена")
             
-            # Перевіряємо чи вже відгукувалися і чи минув термін для повторного відгуку
-            self.logger.debug("🔍 Перевірка чи є відгук...")
+            # ПЕРЕВІРКА 2: Сторінка вакансії - чи є мітка "Ви вже відгукалися"
+            self.logger.debug("🔍 Перевірка чи є відгук на сторінці...")
             # Шукаємо параграф з текстом "Ви вже відгукалися на цю вакансію"
             already_sent = self.page.locator('p:has-text("Ви вже відгукалися")')
             
@@ -721,6 +735,11 @@ class WorkUAScraper:
                         months_passed = (now.year - applied_date.year) * 12 + (now.month - applied_date.month)
                         
                         self.logger.debug(f"📆 Дата відгуку: {applied_date.strftime('%d.%m.%Y')} (минуло {months_passed} міс.)")
+                        
+                        # Оновлюємо базу даних з датою зі сторінки
+                        db_date = applied_date.strftime('%Y-%m-%d')
+                        self.db.add_or_update(job.url, db_date, job.title, job.company)
+                        self.logger.debug(f"💾 Оновлено БД з датою {db_date}")
                         
                         if months_passed < config.REAPPLY_AFTER_MONTHS:
                             self.logger.debug(f"⏭️ Відгукувались {months_passed} міс. тому (потрібно {config.REAPPLY_AFTER_MONTHS}+) - пропускаю")
@@ -840,10 +859,22 @@ class WorkUAScraper:
             if success:
                 self.logger.debug(f"✅ Успішно відгукнулись на: {job.title}")
                 self.applied_jobs.add(job.url)  # Додаємо до списку
+                
+                # Оновлюємо базу даних з поточною датою
+                from datetime import datetime
+                today = datetime.now().strftime('%Y-%m-%d')
+                self.db.add_or_update(job.url, today, job.title, job.company)
+                self.logger.debug(f"💾 Збережено в БД: {today}")
             else:
                 self.logger.debug(f"⚠️ Невідомий статус відгуку (можливо, все ок)")
                 # Додаємо все одно - щоб не спробувати ще раз
                 self.applied_jobs.add(job.url)
+                
+                # Також оновлюємо БД
+                from datetime import datetime
+                today = datetime.now().strftime('%Y-%m-%d')
+                self.db.add_or_update(job.url, today, job.title, job.company)
+                self.logger.debug(f"💾 Збережено в БД: {today}")
             
             return success
             

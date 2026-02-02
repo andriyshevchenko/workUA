@@ -529,9 +529,9 @@ class WorkUAScraper:
             else:
                 self.logger.info(f"⚠️ Сторінка {page_num}: 0 нових вакансій (всі вже переглянуті). Продовжуємо далі...")
             
-            # Перевірка чи досягли цілі
+            # Перевірка чи зібрали достатньо вакансій
             if target_jobs and len(jobs) >= target_jobs:
-                self.logger.info(f"🎯 Досягнуто мету: {len(jobs)}/{target_jobs} вакансій. Зупиняємо сканування.")
+                self.logger.info(f"🎯 Зібрано достатньо: {len(jobs)}/{target_jobs} вакансій. Зупиняємо сканування.")
                 break
             
             # Пауза між сторінками як людина
@@ -697,15 +697,42 @@ class WorkUAScraper:
             await HumanBehavior.page_load_delay()
             self.logger.debug("✅ Сторінка завантажена")
             
-            # Перевіряємо чи вже є відгук через кнопки
-            self.logger.debug("🔍 Перевірка кнопок відгуку...")
+            # Перевіряємо чи вже відгукувалися і чи минув термін для повторного відгуку
+            self.logger.debug("🔍 Перевірка чи є відгук...")
+            # Шукаємо параграф з текстом "Ви вже відгукалися на цю вакансію"
+            already_sent = self.page.locator('p:has-text("Ви вже відгукалися")')
             
-            # Перевіряємо кнопки
-            already_applied = self.page.locator('button:has-text("Переглянути резюме"), button:has-text("Ви відгукнулись")')
-            if await already_applied.count() > 0:
-                self.logger.debug("⏭️ Знайдено кнопку про існуючий відгук - пропускаю")
-                self.applied_jobs.add(job.url)
-                return False
+            can_reapply = True  # За замовчуванням можна відгукуватись
+            
+            if await already_sent.count() > 0:
+                try:
+                    text = await already_sent.first.text_content()
+                    self.logger.debug(f"📅 Знайдено: {text}")
+                    
+                    # Парсимо дату з формату "Ви вже відгукалися на цю вакансію DD.MM.YYYY"
+                    import re
+                    from datetime import datetime
+                    
+                    date_match = re.search(r'(\d{2})\.(\d{2})\.(\d{4})', text)
+                    if date_match:
+                        day, month, year = date_match.groups()
+                        applied_date = datetime(int(year), int(month), int(day))
+                        now = datetime.now()
+                        months_passed = (now.year - applied_date.year) * 12 + (now.month - applied_date.month)
+                        
+                        self.logger.debug(f"📆 Дата відгуку: {applied_date.strftime('%d.%m.%Y')} (минуло {months_passed} міс.)")
+                        
+                        if months_passed < config.REAPPLY_AFTER_MONTHS:
+                            self.logger.debug(f"⏭️ Відгукувались {months_passed} міс. тому (потрібно {config.REAPPLY_AFTER_MONTHS}+) - пропускаю")
+                            self.applied_jobs.add(job.url)
+                            return False
+                        else:
+                            self.logger.debug(f"🔄 Минуло {months_passed} міс. - можна відправити повторно")
+                            can_reapply = True
+                    else:
+                        self.logger.debug("⚠️ Не вдалось розпарсити дату, продовжую")
+                except Exception as e:
+                    self.logger.debug(f"⚠️ Помилка перевірки already-sent: {e}, продовжую")
             
             # LLM аналіз перед відгуком (якщо увімкнено)
             if config.USE_PRE_APPLY_LLM_CHECK:
@@ -730,38 +757,7 @@ class WorkUAScraper:
                 except Exception as e:
                     self.logger.debug(f"⚠️ Помилка LLM аналізу: {e}, продовжую без перевірки")
             
-            # Перевіряємо чи вже відгукувалися і чи минув термін для повторного відгуку
-            already_sent = self.page.locator('[class*="already-sent"], [id*="already-sent"]')
-            if await already_sent.count() > 0:
-                try:
-                    text = await already_sent.first.text_content()
-                    self.logger.debug(f"📅 Знайдено: {text}")
-                    
-                    # Парсимо дату з формату "Ви вже відгукалися на цю вакансію DD.MM.YYYY"
-                    import re
-                    from datetime import datetime
-                    
-                    date_match = re.search(r'(\d{2})\.(\d{2})\.(\d{4})', text)
-                    if date_match:
-                        day, month, year = date_match.groups()
-                        applied_date = datetime(int(year), int(month), int(day))
-                        now = datetime.now()
-                        months_passed = (now.year - applied_date.year) * 12 + (now.month - applied_date.month)
-                        
-                        self.logger.debug(f"📆 Дата відгуку: {applied_date.strftime('%d.%m.%Y')} (минуло {months_passed} міс.)")
-                        
-                        if months_passed < config.REAPPLY_AFTER_MONTHS:
-                            self.logger.debug(f"⏭️ Відгукувались {months_passed} міс. тому (потрібно {config.REAPPLY_AFTER_MONTHS}+) - пропускаю")
-                            self.applied_jobs.add(job.url)
-                            return False
-                        else:
-                            self.logger.debug(f"🔄 Минуло {months_passed} міс. - відправляємо повторно")
-                    else:
-                        self.logger.debug("⚠️ Не вдалось розпарсити дату, продовжую")
-                except Exception as e:
-                    self.logger.debug(f"⚠️ Помилка перевірки already-sent: {e}, продовжую")
-            
-            self.logger.debug("✓ Відгуку немає, можна подавати")
+            self.logger.debug("✓ Перевірки пройдені, можна подавати")
                 
             # Прокрутити до опису як людина читає
             self.logger.debug("📜 Прокручую сторінку...")
@@ -770,24 +766,28 @@ class WorkUAScraper:
             # Рандомна пауза як людина думає чи відгукуватися
             await HumanBehavior.random_delay(1.0, 2.5)
             
-            # Клік на кнопку "Відгукнутися"
-            self.logger.debug("🖱️ Шукаю кнопку 'Відгукнутися'...")
+            # Клік на кнопку "Відгукнутися" або "Переглянути резюме" (якщо вже відгукувались)
+            self.logger.debug("🖱️ Шукаю кнопку відгуку...")
             apply_button = self.page.locator('button:has-text("Відгукнутися")').first
+            
+            # Якщо не знайдено "Відгукнутися", шукаємо "Переглянути резюме" (для повторного відгуку)
             if await apply_button.count() == 0:
-                self.logger.debug("❌ Не знайдено кнопку 'Відгукнутися'")
-                return False
+                self.logger.debug("🔄 Кнопка 'Відгукнутися' не знайдена, шукаю 'Переглянути резюме'...")
+                apply_button = self.page.locator('button:has-text("Переглянути резюме")').first
+                
+                if await apply_button.count() == 0:
+                    self.logger.debug("❌ Не знайдено жодної кнопки для відгуку")
+                    return False
+                else:
+                    self.logger.debug("✓ Знайдено кнопку 'Переглянути резюме' - це повторний відгук")
             
             # Прокрутити до кнопки
             self.logger.debug("📜 Прокручую до кнопки...")
             await apply_button.scroll_into_view_if_needed()
             await HumanBehavior.random_delay(0.5, 1.0)
             
-            self.logger.debug("🖱️ Клікаю 'Відгукнутися'...")
-            await HumanBehavior.click_with_human_behavior(
-                self.page,
-                'button:has-text("Відгукнутися")',
-                scroll_into_view=True
-            )
+            self.logger.debug("🖱️ Клікаю кнопку...")
+            await apply_button.click()
             await self.page.wait_for_load_state('networkidle')
             self.logger.debug("✓ Кнопка натиснута")
             
@@ -805,7 +805,17 @@ class WorkUAScraper:
             self.logger.debug("🖱️ Клікаю 'Надіслати'...")
             await send_button.first.click()
             await self.page.wait_for_load_state('networkidle')
-            self.logger.debug("✓ Резюме відправлено")
+            await HumanBehavior.random_delay(0.5, 1.0)
+            
+            # Перевіряємо чи з'явився діалог підтвердження повторного відгуку
+            confirm_reapply = self.page.locator('button:has-text("Так, відгукнутися")')
+            if await confirm_reapply.count() > 0:
+                self.logger.debug("🔄 Підтвердження повторного відгуку...")
+                await confirm_reapply.first.click()
+                await self.page.wait_for_load_state('networkidle')
+                self.logger.debug("✓ Підтверджено повторний відгук")
+            else:
+                self.logger.debug("✓ Резюме відправлено")
             
             # Може з'явитися додатковий діалог про додавання локації
             await HumanBehavior.random_delay(0.5, 1.0)

@@ -25,6 +25,7 @@ class Config:
     # Налаштування бота
     MAX_APPLICATIONS: int = int(os.getenv("MAX_APPLICATIONS", "10"))
     MAX_VACANCIES: int = int(os.getenv("MAX_VACANCIES", "500"))  # Максимум вакансій для сканування (щоб набрати потрібну кількість відгуків)
+    VACANCY_MULTIPLIER: int = int(os.getenv("VACANCY_MULTIPLIER", "10"))  # Множник для збору вакансій (x10 = збираємо в 10 разів більше для запасу)
     USE_LLM: bool = os.getenv("USE_LLM", "false").lower() == "true"
     MIN_SCORE: int = int(os.getenv("MIN_SCORE", "7"))
     REAPPLY_AFTER_MONTHS: int = int(os.getenv("REAPPLY_AFTER_MONTHS", "2"))  # Через скільки місяців можна відправити резюме повторно

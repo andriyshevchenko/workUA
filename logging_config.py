@@ -1,4 +1,5 @@
 """Logging configuration module"""
+
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -6,7 +7,7 @@ from pathlib import Path
 
 def setup_logging() -> logging.Logger:
     """Setup logging to console and file
-    
+
     Returns:
         Configured root logger
     """
@@ -17,7 +18,7 @@ def setup_logging() -> logging.Logger:
 
     # Log format
     formatter = logging.Formatter(
-        '%(asctime)s | %(levelname)-8s | %(message)s', datefmt='%Y-%m-%d %H:%M:%S'
+        "%(asctime)s | %(levelname)-8s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
     )
 
     # Console handler
@@ -26,7 +27,7 @@ def setup_logging() -> logging.Logger:
     console_handler.setFormatter(formatter)
 
     # File handler
-    file_handler = logging.FileHandler(log_file, encoding='utf-8')
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(formatter)
 

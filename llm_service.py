@@ -1,4 +1,5 @@
 """Service for LLM-based job analysis"""
+
 import json
 import logging
 import re
@@ -17,7 +18,7 @@ class LLMAnalysisService:
         self.use_llm = False
         self.resume_text = ""
 
-        if config.OPENAI_API_KEY and hasattr(config, 'USE_LLM') and config.USE_LLM:
+        if config.OPENAI_API_KEY and hasattr(config, "USE_LLM") and config.USE_LLM:
             try:
                 self.client = OpenAI(api_key=config.OPENAI_API_KEY)
                 self.use_llm = True
@@ -30,15 +31,15 @@ class LLMAnalysisService:
 
     def load_resume(self, resume_path: str) -> str:
         """Load user resume from file
-        
+
         Args:
             resume_path: Path to resume file
-            
+
         Returns:
             Resume text content or fallback text
         """
         try:
-            with open(resume_path, 'r', encoding='utf-8') as f:
+            with open(resume_path, "r", encoding="utf-8") as f:
                 resume_text = f.read()
             self.resume_text = resume_text
             return resume_text
@@ -69,14 +70,14 @@ class LLMAnalysisService:
         description: str,
     ) -> Tuple[bool, int, str]:
         """Analyze if a job matches the candidate's profile
-        
+
         Args:
             job_title: Job title
             company: Company name
             location: Job location
             salary: Salary information
             description: Job description
-            
+
         Returns:
             Tuple of (should_apply, score, reason)
         """
@@ -85,9 +86,7 @@ class LLMAnalysisService:
             return True, 10, "Brute force mode - applying to all"
 
         try:
-            prompt = self._build_analysis_prompt(
-                job_title, company, location, salary, description
-            )
+            prompt = self._build_analysis_prompt(job_title, company, location, salary, description)
 
             response = self.client.chat.completions.create(
                 model="gpt-4o",
@@ -107,7 +106,7 @@ class LLMAnalysisService:
             reason = result.get("reason", "")
 
             # Threshold for applying (can be in config)
-            min_score = getattr(config, 'MIN_SCORE', 7)
+            min_score = getattr(config, "MIN_SCORE", 7)
             should_apply = score >= min_score
 
             return should_apply, score, reason
@@ -126,14 +125,14 @@ class LLMAnalysisService:
         description: str,
     ) -> str:
         """Build the analysis prompt for LLM
-        
+
         Args:
             job_title: Job title
             company: Company name
             location: Job location
             salary: Salary information
             description: Job description
-            
+
         Returns:
             Formatted prompt string
         """
@@ -162,10 +161,10 @@ RESPONSE FORMAT (JSON):
 
     def analyze_job_match(self, job_description: str) -> Tuple[int, str]:
         """Analyze job match probability with LLM
-        
+
         Args:
             job_description: Full job description text
-            
+
         Returns:
             Tuple of (probability 0-100%, explanation)
         """
@@ -208,16 +207,12 @@ Consider:
             result = response.choices[0].message.content
 
             # Parse the response
-            probability_match = re.search(r'PROBABILITY:\s*(\d+)', result)
-            explanation_match = re.search(r'EXPLANATION:\s*(.+)', result, re.DOTALL)
+            probability_match = re.search(r"PROBABILITY:\s*(\d+)", result)
+            explanation_match = re.search(r"EXPLANATION:\s*(.+)", result, re.DOTALL)
 
             if probability_match:
                 probability = int(probability_match.group(1))
-                explanation = (
-                    explanation_match.group(1).strip()
-                    if explanation_match
-                    else result
-                )
+                explanation = explanation_match.group(1).strip() if explanation_match else result
                 return probability, explanation
             else:
                 # If parsing failed, return default values

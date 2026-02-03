@@ -1,22 +1,23 @@
 """
 Скрипт для конвертації інструкції з Markdown в PDF
 """
+
 import markdown
 from pathlib import Path
 
+
 def markdown_to_html(md_file: str, html_file: str):
     """Конвертує Markdown в HTML з гарним стилем"""
-    
+
     # Читаємо markdown файл
-    with open(md_file, 'r', encoding='utf-8') as f:
+    with open(md_file, "r", encoding="utf-8") as f:
         md_content = f.read()
-    
+
     # Конвертуємо в HTML
     html_content = markdown.markdown(
-        md_content,
-        extensions=['tables', 'fenced_code', 'codehilite', 'toc']
+        md_content, extensions=["tables", "fenced_code", "codehilite", "toc"]
     )
-    
+
     # Додаємо CSS стилі для красивого вигляду
     full_html = f"""
 <!DOCTYPE html>
@@ -190,24 +191,25 @@ def markdown_to_html(md_file: str, html_file: str):
 </body>
 </html>
 """
-    
+
     # Зберігаємо HTML
-    with open(html_file, 'w', encoding='utf-8') as f:
+    with open(html_file, "w", encoding="utf-8") as f:
         f.write(full_html)
-    
+
     print(f"✅ HTML створено: {html_file}")
     return html_file
+
 
 if __name__ == "__main__":
     md_file = "ІНСТРУКЦІЯ_ДЛЯ_КОРИСТУВАЧА.md"
     html_file = "ІНСТРУКЦІЯ_ДЛЯ_КОРИСТУВАЧА.html"
-    
+
     print("🔄 Конвертую Markdown в HTML...")
     html_path = markdown_to_html(md_file, html_file)
-    
-    print("\n" + "="*60)
+
+    print("\n" + "=" * 60)
     print("✅ HTML файл створено!")
-    print("="*60)
+    print("=" * 60)
     print(f"\n📄 Файл: {html_path}")
     print("\n💡 Як створити PDF:")
     print("   1. Відкрийте файл в браузері (Chrome або Edge)")
@@ -215,4 +217,4 @@ if __name__ == "__main__":
     print("   3. Оберіть 'Зберегти як PDF'")
     print("   4. Налаштуйте поля та масштаб")
     print("   5. Збережіть файл")
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)

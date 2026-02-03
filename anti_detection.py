@@ -6,31 +6,31 @@ class BrowserAntiDetection:
 
     # Browser launch arguments
     BROWSER_ARGS = [
-        '--disable-blink-features=AutomationControlled',
-        '--disable-dev-shm-usage',
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-web-security',
-        '--disable-features=IsolateOrigins,site-per-process',
-        '--start-maximized',
+        "--disable-blink-features=AutomationControlled",
+        "--disable-dev-shm-usage",
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-web-security",
+        "--disable-features=IsolateOrigins,site-per-process",
+        "--start-maximized",
     ]
 
     # Browser context configuration
     CONTEXT_CONFIG = {
-        'no_viewport': True,
-        'locale': 'uk-UA',
-        'timezone_id': 'Europe/Kyiv',
-        'permissions': ['geolocation'],
-        'geolocation': {'latitude': 50.4501, 'longitude': 30.5234},  # Kyiv
-        'color_scheme': 'light',
-        'has_touch': False,
-        'is_mobile': False,
+        "no_viewport": True,
+        "locale": "uk-UA",
+        "timezone_id": "Europe/Kyiv",
+        "permissions": ["geolocation"],
+        "geolocation": {"latitude": 50.4501, "longitude": 30.5234},  # Kyiv
+        "color_scheme": "light",
+        "has_touch": False,
+        "is_mobile": False,
     }
 
     @staticmethod
     def get_init_script() -> str:
         """Get JavaScript initialization script for anti-detection
-        
+
         Returns:
             JavaScript code as string to inject into page
         """

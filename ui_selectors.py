@@ -10,7 +10,7 @@ class WorkUASelectors:
     SEARCH_URL = "https://www.work.ua/jobs/"
 
     # Login Page
-    PHONE_INPUT = '#phone'
+    PHONE_INPUT = "#phone"
     SUBMIT_BUTTON = 'button[type="submit"]'
 
     # Navigation
@@ -35,7 +35,7 @@ class WorkUASelectors:
     NOT_ADD_BUTTON = 'button:has-text("Не додавати")'
 
     # Success Indicators
-    SUCCESS_TEXT_PATTERNS = ['успішно', 'Дякуємо', 'відгукнулись']
+    SUCCESS_TEXT_PATTERNS = ["успішно", "Дякуємо", "відгукнулись"]
 
     # Pagination
     NEXT_PAGE_LINK = 'a[rel="next"]'
@@ -45,7 +45,7 @@ class UserAgents:
     """List of realistic user agents for anti-detection"""
 
     CHROME_AGENTS = [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36",
     ]

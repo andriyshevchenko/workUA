@@ -16,7 +16,13 @@ class TestConfig:
         assert Config.MODEL_NAME == os.getenv("MODEL_NAME", "gpt-4o")
 
     def test_search_keywords_parsing(self):
-        """Test parsing of search keywords from environment"""
+        """Test parsing of search keywords from environment
+        
+        Note: Module reload is necessary here because Config class attributes
+        are loaded at import time from environment variables. This is a design
+        limitation of the current Config implementation but is acceptable for
+        these isolated tests.
+        """
         with patch.dict(os.environ, {"SEARCH_KEYWORDS": "python,javascript,react"}):
             from importlib import reload
             import config as config_module

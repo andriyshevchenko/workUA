@@ -1,7 +1,7 @@
 """Простий бот для автоматичного відгуку на вакансії Work.ua"""
 import asyncio
 import logging
-from typing import List
+from typing import List, Tuple
 
 from scraper import WorkUAScraper, JobListing
 from config import config
@@ -21,7 +21,7 @@ class WorkUABot:
         resume_path = getattr(config, 'RESUME_PATH', 'resume_Osipov_Ernest.txt')
         self.llm_service.load_resume(resume_path)
     
-    def analyze_job(self, job: JobListing) -> tuple[bool, int, str]:
+    def analyze_job(self, job: JobListing) -> Tuple[bool, int, str]:
         """Проаналізувати вакансію
         
         Returns:

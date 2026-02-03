@@ -1,4 +1,4 @@
-"""Тест remote фільтру для Work.ua"""
+"""Тест remote фільтра для Work.ua"""
 import asyncio
 from scraper import WorkUAScraper
 from utils import separator_line

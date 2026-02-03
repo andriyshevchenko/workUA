@@ -285,12 +285,32 @@ class WorkUAScraper:
         except Exception as e:
             print(f"⚠️ Помилка LLM аналізу: {e}")
             return (50, f"Помилка аналізу: {e}")
+
+    async def _navigate_and_wait(
+        self,
+        url: str,
+        *,
+        timeout: Optional[int] = None,
+        wait_timeout: Optional[int] = None,
+        add_delay: bool = True,
+    ):
+        """Перейти на URL та дочекатися завантаження сторінки."""
+        if timeout is None:
+            await self.page.goto(url)
+        else:
+            await self.page.goto(url, timeout=timeout)
+
+        if wait_timeout is None:
+            await self.page.wait_for_load_state('networkidle')
+        else:
+            await self.page.wait_for_load_state('networkidle', timeout=wait_timeout)
+
+        if add_delay:
+            await HumanBehavior.page_load_delay()
         
     async def check_login_status(self) -> bool:
         """Перевірити чи користувач авторизований"""
-        await self.page.goto(config.WORKUA_BASE_URL)
-        await self.page.wait_for_load_state('networkidle')
-        await HumanBehavior.page_load_delay()
+        await self._navigate_and_wait(config.WORKUA_BASE_URL)
         
         # Шукаємо посилання "Мій розділ" - якщо є, то авторизовані
         try:
@@ -312,9 +332,7 @@ class WorkUAScraper:
             
         try:
             # Перейти на сторінку логіну для шукачів роботи
-            await self.page.goto("https://www.work.ua/jobseeker/login/")
-            await self.page.wait_for_load_state('networkidle')
-            await HumanBehavior.page_load_delay()
+            await self._navigate_and_wait("https://www.work.ua/jobseeker/login/")
             
             # Якщо перенаправило на особистий розділ - вже авторизовані
             if '/jobseeker/my/' in self.page.url:
@@ -427,11 +445,9 @@ class WorkUAScraper:
                         print(f"💰 [REMOTE] Фільтр мін. зарплати: salaryfrom={config.MIN_SALARY}")
                     
                     print(f"🌐 [REMOTE] Перехід на URL: {search_url}")
-                    await self.page.goto(search_url)
                     print(f"⏳ [REMOTE] Очікування завантаження сторінки...")
-                    await self.page.wait_for_load_state('networkidle')
+                    await self._navigate_and_wait(search_url)
                     print(f"✅ [REMOTE] Сторінка завантажена")
-                    await HumanBehavior.page_load_delay()
                     print(f"🖱️ [REMOTE] Рух миші")
                     # Невеликий рух миші
                     await HumanBehavior.random_mouse_movement(self.page, num_movements=1)
@@ -439,9 +455,7 @@ class WorkUAScraper:
                 else:
                     print(f"🌐 [FORM] Перехід на сторінку пошуку: {config.WORKUA_SEARCH_URL}")
                     # Для звичайного пошуку використовуємо форму
-                    await self.page.goto(config.WORKUA_SEARCH_URL)
-                    await self.page.wait_for_load_state('networkidle')
-                    await HumanBehavior.page_load_delay()
+                    await self._navigate_and_wait(config.WORKUA_SEARCH_URL)
                     
                     # Заповнюємо форму
                     # Невеликі рухи миші як людина дивиться на сторінку
@@ -506,9 +520,7 @@ class WorkUAScraper:
                     url = f"{current_url}?page={page_num}"
                 
                 print(f"📄 Перехід на сторінку {page_num}: {url}")
-                await self.page.goto(url)
-                await self.page.wait_for_load_state('networkidle')
-                await HumanBehavior.page_load_delay()
+                await self._navigate_and_wait(url)
             
             print(f"🔍 Пошук сторінка {page_num}: {self.page.url}")
             
@@ -655,10 +667,8 @@ class WorkUAScraper:
     async def get_job_details(self, job: JobListing) -> JobListing:
         """Отримати повні деталі вакансії з людиноподібною поведінкою"""
         print(f"📄 Завантаження деталей: {job.title}")
-        
-        await self.page.goto(job.url)
-        await self.page.wait_for_load_state('networkidle')
-        await HumanBehavior.page_load_delay()
+
+        await self._navigate_and_wait(job.url)
         
         # Опис вакансії - знаходиться в секції з заголовком "Опис вакансії"
         try:
@@ -703,9 +713,7 @@ class WorkUAScraper:
         # Переходимо на вакансію в основній вкладці
         try:
             self.logger.debug("🌐 Переходжу на сторінку вакансії...")
-            await self.page.goto(job.url, timeout=60000)  # Збільшено до 60 секунд
-            await self.page.wait_for_load_state('networkidle', timeout=30000)
-            await HumanBehavior.page_load_delay()
+            await self._navigate_and_wait(job.url, timeout=60000, wait_timeout=30000)
             self.logger.debug("✅ Сторінка завантажена")
             
             # ПЕРЕВІРКА 2: Сторінка вакансії - чи є мітка "Ви вже відгукалися"

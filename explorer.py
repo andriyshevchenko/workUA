@@ -37,6 +37,11 @@ class WorkUAExplorer:
         if self.playwright:
             await self.playwright.stop()
         print("✓ Браузер закрито")
+
+    async def _navigate_and_wait(self, url: str):
+        """Перейти на URL та дочекатися завантаження сторінки."""
+        await self.page.goto(url)
+        await self.page.wait_for_load_state('networkidle')
         
     async def save_cookies(self, filepath: str = "cookies.json"):
         """Зберегти cookies для майбутнього використання"""
@@ -59,8 +64,7 @@ class WorkUAExplorer:
     async def explore_main_page(self):
         """Дослідити головну сторінку"""
         print("\n=== ДОСЛІДЖЕННЯ ГОЛОВНОЇ СТОРІНКИ ===")
-        await self.page.goto(config.WORKUA_BASE_URL)
-        await self.page.wait_for_load_state('networkidle')
+        await self._navigate_and_wait(config.WORKUA_BASE_URL)
         
         # Зробити скріншот
         await self.page.screenshot(path='screenshots/main_page.png', full_page=True)
@@ -81,8 +85,7 @@ class WorkUAExplorer:
         print("\n=== ДОСЛІДЖЕННЯ СТОРІНКИ ЛОГІНУ ===")
         
         # Перейти на сторінку логіну через кнопку
-        await self.page.goto(config.WORKUA_BASE_URL)
-        await self.page.wait_for_load_state('networkidle')
+        await self._navigate_and_wait(config.WORKUA_BASE_URL)
         
         # Клік на "Увійти" використовуючи role selector
         login_link = self.page.get_by_role('link', name='Увійти')
@@ -112,8 +115,7 @@ class WorkUAExplorer:
             return False
             
         # Перейти на головну
-        await self.page.goto(config.WORKUA_BASE_URL)
-        await self.page.wait_for_load_state('networkidle')
+        await self._navigate_and_wait(config.WORKUA_BASE_URL)
         
         # Клік на "Увійти"
         print("📱 Натискаю 'Увійти'...")
@@ -180,8 +182,7 @@ class WorkUAExplorer:
         
         # Формуємо URL пошуку
         search_url = f"{config.WORKUA_SEARCH_URL}?search={keyword.replace(' ', '+')}"
-        await self.page.goto(search_url)
-        await self.page.wait_for_load_state('networkidle')
+        await self._navigate_and_wait(search_url)
         
         await self.page.screenshot(path='screenshots/search_page.png', full_page=True)
         print("✓ Скріншот сторінки пошуку збережено")
@@ -218,8 +219,7 @@ class WorkUAExplorer:
         
         # Спочатку йдемо на пошук
         search_url = f"{config.WORKUA_SEARCH_URL}?search=python+developer"
-        await self.page.goto(search_url)
-        await self.page.wait_for_load_state('networkidle')
+        await self._navigate_and_wait(search_url)
         
         # Клікаємо на першу вакансію
         first_job = await self.page.query_selector('.card.card-hover a, .job-link')

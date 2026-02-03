@@ -200,6 +200,18 @@ class WorkUAScraper:
             await self.browser.close()
         if self.playwright:
             await self.playwright.stop()
+    
+    async def _wait_for_page_load(self, timeout: Optional[int] = None):
+        """Helper method to wait for page load with human-like delay
+        
+        Args:
+            timeout: Optional timeout in milliseconds for wait_for_load_state
+        """
+        if timeout:
+            await self.page.wait_for_load_state('networkidle', timeout=timeout)
+        else:
+            await self.page.wait_for_load_state('networkidle')
+        await HumanBehavior.page_load_delay()
             
     async def save_cookies(self, filepath: str = "cookies.json"):
         """Зберегти cookies"""
@@ -289,8 +301,7 @@ class WorkUAScraper:
     async def check_login_status(self) -> bool:
         """Перевірити чи користувач авторизований"""
         await self.page.goto(config.WORKUA_BASE_URL)
-        await self.page.wait_for_load_state('networkidle')
-        await HumanBehavior.page_load_delay()
+        await self._wait_for_page_load()
         
         # Шукаємо посилання "Мій розділ" - якщо є, то авторизовані
         try:
@@ -313,8 +324,7 @@ class WorkUAScraper:
         try:
             # Перейти на сторінку логіну для шукачів роботи
             await self.page.goto("https://www.work.ua/jobseeker/login/")
-            await self.page.wait_for_load_state('networkidle')
-            await HumanBehavior.page_load_delay()
+            await self._wait_for_page_load()
             
             # Якщо перенаправило на особистий розділ - вже авторизовані
             if '/jobseeker/my/' in self.page.url:
@@ -429,9 +439,8 @@ class WorkUAScraper:
                     print(f"🌐 [REMOTE] Перехід на URL: {search_url}")
                     await self.page.goto(search_url)
                     print(f"⏳ [REMOTE] Очікування завантаження сторінки...")
-                    await self.page.wait_for_load_state('networkidle')
+                    await self._wait_for_page_load()
                     print(f"✅ [REMOTE] Сторінка завантажена")
-                    await HumanBehavior.page_load_delay()
                     print(f"🖱️ [REMOTE] Рух миші")
                     # Невеликий рух миші
                     await HumanBehavior.random_mouse_movement(self.page, num_movements=1)
@@ -440,8 +449,7 @@ class WorkUAScraper:
                     print(f"🌐 [FORM] Перехід на сторінку пошуку: {config.WORKUA_SEARCH_URL}")
                     # Для звичайного пошуку використовуємо форму
                     await self.page.goto(config.WORKUA_SEARCH_URL)
-                    await self.page.wait_for_load_state('networkidle')
-                    await HumanBehavior.page_load_delay()
+                    await self._wait_for_page_load()
                     
                     # Заповнюємо форму
                     # Невеликі рухи миші як людина дивиться на сторінку
@@ -492,8 +500,7 @@ class WorkUAScraper:
                         'button[type="submit"], button:has-text("Знайти")',
                         scroll_into_view=False
                     )
-                    await self.page.wait_for_load_state('networkidle')
-                    await HumanBehavior.page_load_delay()
+                    await self._wait_for_page_load()
             else:
                 # Наступні сторінки - додаємо ?page=N або &page=N
                 current_url = self.page.url.split('?')[0]  # Базовий URL без параметрів
@@ -507,8 +514,7 @@ class WorkUAScraper:
                 
                 print(f"📄 Перехід на сторінку {page_num}: {url}")
                 await self.page.goto(url)
-                await self.page.wait_for_load_state('networkidle')
-                await HumanBehavior.page_load_delay()
+                await self._wait_for_page_load()
             
             print(f"🔍 Пошук сторінка {page_num}: {self.page.url}")
             
@@ -657,8 +663,7 @@ class WorkUAScraper:
         print(f"📄 Завантаження деталей: {job.title}")
         
         await self.page.goto(job.url)
-        await self.page.wait_for_load_state('networkidle')
-        await HumanBehavior.page_load_delay()
+        await self._wait_for_page_load()
         
         # Опис вакансії - знаходиться в секції з заголовком "Опис вакансії"
         try:
@@ -704,8 +709,7 @@ class WorkUAScraper:
         try:
             self.logger.debug("🌐 Переходжу на сторінку вакансії...")
             await self.page.goto(job.url, timeout=60000)  # Збільшено до 60 секунд
-            await self.page.wait_for_load_state('networkidle', timeout=30000)
-            await HumanBehavior.page_load_delay()
+            await self._wait_for_page_load(timeout=30000)
             self.logger.debug("✅ Сторінка завантажена")
             
             # ПЕРЕВІРКА 2: Сторінка вакансії - чи є мітка "Ви вже відгукалися"
@@ -822,7 +826,7 @@ class WorkUAScraper:
                     # Якщо обидва кліки не вдались - пропускаємо вакансію
                     return False
             
-            await self.page.wait_for_load_state('networkidle', timeout=30000)
+            await self._wait_for_page_load(timeout=30000)
             self.logger.debug("✓ Кнопка натиснута")
             
             # Чекаємо появи dialog/modal з формою
@@ -838,7 +842,7 @@ class WorkUAScraper:
             
             self.logger.debug("🖱️ Клікаю 'Надіслати'...")
             await send_button.first.click()
-            await self.page.wait_for_load_state('networkidle')
+            await self._wait_for_page_load()
             await HumanBehavior.random_delay(0.5, 1.0)
             
             # Перевіряємо чи з'явився діалог підтвердження повторного відгуку
@@ -846,7 +850,7 @@ class WorkUAScraper:
             if await confirm_reapply.count() > 0:
                 self.logger.debug("🔄 Підтвердження повторного відгуку...")
                 await confirm_reapply.first.click()
-                await self.page.wait_for_load_state('networkidle')
+                await self._wait_for_page_load()
                 self.logger.debug("✓ Підтверджено повторний відгук")
             else:
                 self.logger.debug("✓ Резюме відправлено")
@@ -857,7 +861,7 @@ class WorkUAScraper:
             if await not_add_button.count() > 0:
                 self.logger.debug("🖱️ Закриваю діалог локації...")
                 await not_add_button.first.click()
-                await self.page.wait_for_load_state('networkidle')
+                await self._wait_for_page_load()
             
             # Перевіряємо чи успішно відгукнулись
             await HumanBehavior.random_delay(0.5, 1.0)

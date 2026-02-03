@@ -4,6 +4,21 @@ from scraper import WorkUAScraper, JobListing
 from config import config
 
 
+def print_section(title: str, width: int = 60):
+    """Print a section header with decorative lines
+    
+    Args:
+        title: Section title to display
+        width: Width of the decorative line (default: 60)
+    """
+    print(f"\n{'='*width}")
+    if title:
+        print(title)
+        print(f"{'='*width}\n")
+    else:
+        print()
+
+
 async def test_apply_workflow():
     """Тестуємо повний процес відгуку на вакансію"""
     
@@ -12,9 +27,7 @@ async def test_apply_workflow():
     
     # Перевірка авторизації
     is_logged_in = await scraper.check_login_status()
-    print(f"\n{'='*60}")
-    print(f"Статус авторизації: {'✅ Авторизовано' if is_logged_in else '❌ Не авторизовано'}")
-    print(f"{'='*60}\n")
+    print_section(f"Статус авторизації: {'✅ Авторизовано' if is_logged_in else '❌ Не авторизовано'}")
     
     if not is_logged_in:
         print("⚠️ Потрібна авторизація. Запустіть explorer.py спочатку.")
@@ -36,13 +49,12 @@ async def test_apply_workflow():
     
     # Беремо першу вакансію для тесту
     test_job = jobs[0]
-    print(f"\n{'='*60}")
-    print(f"📋 Тестова вакансія:")
+    print_section("📋 Тестова вакансія:")
     print(f"   Назва: {test_job.title}")
     print(f"   Компанія: {test_job.company}")
     print(f"   Локація: {test_job.location}")
     print(f"   URL: {test_job.url}")
-    print(f"{'='*60}\n")
+    print_section("")
     
     # Завантажуємо деталі
     print("📄 Завантаження деталей вакансії...\n")
@@ -54,22 +66,18 @@ async def test_apply_workflow():
         print(f"📝 Опис (перші 200 символів):\n{desc_preview}\n")
     
     # Питаємо користувача чи відгукуватися
-    print(f"{'='*60}")
-    response = input("❓ Відгукнутися на цю вакансію? (y/n): ")
-    print(f"{'='*60}\n")
+    print_section("❓ Відгукнутися на цю вакансію? (y/n): ", width=60)
+    response = input()
+    print_section("")
     
     if response.lower() == 'y':
         print("🚀 Починаємо процес відгуку...\n")
         success = await scraper.apply_to_job(test_job)
         
         if success:
-            print(f"\n{'='*60}")
-            print("🎉 ТЕСТ УСПІШНИЙ! Відгук надіслано!")
-            print(f"{'='*60}\n")
+            print_section("🎉 ТЕСТ УСПІШНИЙ! Відгук надіслано!")
         else:
-            print(f"\n{'='*60}")
-            print("❌ ТЕСТ ПРОВАЛЕНИЙ! Не вдалось надіслати відгук")
-            print(f"{'='*60}\n")
+            print_section("❌ ТЕСТ ПРОВАЛЕНИЙ! Не вдалось надіслати відгук")
     else:
         print("⏭️ Пропускаємо відгук (тест не виконано)\n")
     

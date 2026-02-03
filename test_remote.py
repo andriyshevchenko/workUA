@@ -4,15 +4,28 @@ from scraper import WorkUAScraper
 from config import config
 
 
+def print_section(title: str, width: int = 60):
+    """Print a section header with decorative lines
+    
+    Args:
+        title: Section title to display
+        width: Width of the decorative line (default: 60)
+    """
+    print(f"\n{'='*width}")
+    if title:
+        print(title)
+        print(f"{'='*width}\n")
+    else:
+        print()
+
+
 async def test_remote_search():
     """Тестуємо пошук дистанційних вакансій"""
     
     scraper = WorkUAScraper()
     await scraper.start(headless=False)
     
-    print("\n" + "="*60)
-    print("🧪 ТЕСТ: Пошук ДИСТАНЦІЙНИХ вакансій (remote=True)")
-    print("="*60 + "\n")
+    print_section("🧪 ТЕСТ: Пошук ДИСТАНЦІЙНИХ вакансій (remote=True)")
     
     jobs = await scraper.search_jobs(
         keyword="python developer",
@@ -29,9 +42,7 @@ async def test_remote_search():
         print(f"   🔗 {job.url}")
         print()
     
-    print("\n" + "="*60)
-    print("🧪 ТЕСТ: Пошук ЗВИЧАЙНИХ вакансій (remote=False)")
-    print("="*60 + "\n")
+    print_section("🧪 ТЕСТ: Пошук ЗВИЧАЙНИХ вакансій (remote=False)")
     
     jobs_normal = await scraper.search_jobs(
         keyword="python developer",
@@ -51,9 +62,7 @@ async def test_remote_search():
     
     await scraper.close()
     
-    print("\n" + "="*60)
-    print("✨ ТЕСТ ЗАВЕРШЕНО")
-    print("="*60)
+    print_section("✨ ТЕСТ ЗАВЕРШЕНО")
 
 
 if __name__ == "__main__":

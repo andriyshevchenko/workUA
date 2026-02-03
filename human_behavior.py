@@ -9,6 +9,21 @@ class HumanBehavior:
     """Емуляція людської поведінки в браузері"""
     
     @staticmethod
+    def _get_viewport_size(page: Page) -> dict:
+        """Get viewport size with fallback to default
+        
+        Args:
+            page: Playwright page
+            
+        Returns:
+            Dict with 'width' and 'height' keys
+        """
+        viewport_size = page.viewport_size
+        if viewport_size is None:
+            return {'width': 1920, 'height': 1080}
+        return viewport_size
+    
+    @staticmethod
     async def random_delay(min_seconds: float = 0.5, max_seconds: float = 2.0):
         """Рандомна затримка для емуляції людини"""
         delay = random.uniform(min_seconds, max_seconds)
@@ -62,11 +77,7 @@ class HumanBehavior:
             steps: Кількість кроків для руху
         """
         # Отримати поточну позицію (припускаємо центр екрану)
-        viewport_size = page.viewport_size
-        
-        # Якщо viewport None (no_viewport=True), використати дефолтні розміри
-        if viewport_size is None:
-            viewport_size = {'width': 1920, 'height': 1080}
+        viewport_size = HumanBehavior._get_viewport_size(page)
         
         start_x = viewport_size['width'] / 2
         start_y = viewport_size['height'] / 2
@@ -203,11 +214,7 @@ class HumanBehavior:
             page: Playwright page
             num_movements: Кількість рухів
         """
-        viewport_size = page.viewport_size
-        
-        # Якщо viewport None (no_viewport=True), використати дефолтні розміри
-        if viewport_size is None:
-            viewport_size = {'width': 1920, 'height': 1080}
+        viewport_size = HumanBehavior._get_viewport_size(page)
         
         for _ in range(num_movements):
             # Випадкова точка в межах вікна

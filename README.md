@@ -1,5 +1,10 @@
 # 🤖 Work.ua Бот
 
+[![CI](https://github.com/andriyshevchenko/workUA/actions/workflows/ci.yml/badge.svg)](https://github.com/andriyshevchenko/workUA/actions/workflows/ci.yml)
+[![Tests](https://github.com/andriyshevchenko/workUA/actions/workflows/test.yml/badge.svg)](https://github.com/andriyshevchenko/workUA/actions/workflows/test.yml)
+[![Code Quality](https://github.com/andriyshevchenko/workUA/actions/workflows/lint.yml/badge.svg)](https://github.com/andriyshevchenko/workUA/actions/workflows/lint.yml)
+[![CodeQL](https://github.com/andriyshevchenko/workUA/actions/workflows/codeql.yml/badge.svg)](https://github.com/andriyshevchenko/workUA/actions/workflows/codeql.yml)
+
 Автоматичний бот для розсилки резюме на вакансії Work.ua з опціональним LLM аналізом та **продвинутим обходом детекції ботів**.
 
 ## ✨ Особливості

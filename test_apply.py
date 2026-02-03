@@ -1,7 +1,6 @@
 """Тест процесу відгуку на вакансію"""
 import asyncio
-from scraper import WorkUAScraper, JobListing
-from config import config
+from scraper import WorkUAScraper
 from utils import separator_line
 
 
@@ -38,7 +37,7 @@ async def test_apply_workflow():
     # Беремо першу вакансію для тесту
     test_job = jobs[0]
     print(f"\n{separator_line()}")
-    print(f"📋 Тестова вакансія:")
+    print("📋 Тестова вакансія:")
     print(f"   Назва: {test_job.title}")
     print(f"   Компанія: {test_job.company}")
     print(f"   Локація: {test_job.location}")

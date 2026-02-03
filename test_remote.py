@@ -1,7 +1,6 @@
 """Тест remote фільтру для Work.ua"""
 import asyncio
 from scraper import WorkUAScraper
-from config import config
 from utils import separator_line
 
 

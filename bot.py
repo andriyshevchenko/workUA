@@ -18,12 +18,25 @@ class WorkUABot:
         self.scraper = None
         self.llm_service = LLMAnalysisService()
 
-        # Load resume from config if set and exists, otherwise use bundled default
-        configured_path = getattr(config, "RESUME_PATH", None)
-        if configured_path and isinstance(configured_path, str) and configured_path.strip():
-            resume_path = configured_path.strip()
-        else:
-            resume_path = "resume_Osipov_Ernest.txt"
+        # Load resume using same logic as scraper for consistency
+        import os
+
+        resume_path = getattr(config, "RESUME_PATH", "./my_resume.pdf")
+        if not os.path.exists(resume_path):
+            fallback_path = "resume_Osipov_Ernest.txt"
+            if os.path.exists(fallback_path):
+                self.logger.warning(
+                    "Configured resume path '%s' not found, using bundled '%s'",
+                    resume_path,
+                    fallback_path,
+                )
+                resume_path = fallback_path
+            else:
+                self.logger.warning(
+                    "Neither configured resume path '%s' nor fallback '%s' exist",
+                    resume_path,
+                    fallback_path,
+                )
         self.llm_service.load_resume(resume_path)
 
     def analyze_job(self, job: JobListing) -> Tuple[bool, int, str]:

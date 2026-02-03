@@ -56,8 +56,6 @@ class WorkUAScraper:
 
         # Load resume for LLM analysis
         if self.llm_service.use_llm:
-            import os
-
             # Use configured resume path, but fall back to the shipped .txt resume if missing
             resume_path = getattr(config, "RESUME_PATH", "./my_resume.pdf")
             if not os.path.exists(resume_path):
@@ -578,6 +576,8 @@ class WorkUAScraper:
                     job.description = await main_elem.text_content()
                     job.description = job.description.strip()
             except Exception:
+                # Fallback failed - main element not found or inaccessible
+                # Continue with empty description rather than blocking the workflow
                 pass
 
         return job

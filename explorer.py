@@ -38,10 +38,22 @@ class WorkUAExplorer:
             await self.playwright.stop()
         print("✓ Браузер закрито")
 
-    async def _navigate_and_wait(self, url: str):
-        """Перейти на URL та дочекатися завантаження сторінки."""
-        await self.page.goto(url)
-        await self.page.wait_for_load_state('networkidle')
+    async def _navigate_and_wait(
+        self,
+        url: str,
+        *,
+        timeout: int | None = None,
+        wait_timeout: int | None = None,
+    ):
+        """Перейти на URL та дочекатися завантаження сторінки.
+
+        Args:
+            url: URL для переходу.
+            timeout: Таймаут для переходу (мс), None = дефолт Playwright.
+            wait_timeout: Таймаут очікування networkidle (мс), None = дефолт Playwright.
+        """
+        await self.page.goto(url, timeout=timeout)
+        await self.page.wait_for_load_state('networkidle', timeout=wait_timeout)
         
     async def save_cookies(self, filepath: str = "cookies.json"):
         """Зберегти cookies для майбутнього використання"""

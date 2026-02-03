@@ -294,16 +294,16 @@ class WorkUAScraper:
         wait_timeout: Optional[int] = None,
         add_delay: bool = True,
     ):
-        """Перейти на URL та дочекатися завантаження сторінки."""
-        if timeout is None:
-            await self.page.goto(url)
-        else:
-            await self.page.goto(url, timeout=timeout)
+        """Перейти на URL та дочекатися завантаження сторінки.
 
-        if wait_timeout is None:
-            await self.page.wait_for_load_state('networkidle')
-        else:
-            await self.page.wait_for_load_state('networkidle', timeout=wait_timeout)
+        Args:
+            url: URL для переходу.
+            timeout: Таймаут для переходу (мс), None = дефолт Playwright.
+            wait_timeout: Таймаут очікування networkidle (мс), None = дефолт Playwright.
+            add_delay: Додати людиноподібну затримку після завантаження.
+        """
+        await self.page.goto(url, timeout=timeout)
+        await self.page.wait_for_load_state('networkidle', timeout=wait_timeout)
 
         if add_delay:
             await HumanBehavior.page_load_delay()

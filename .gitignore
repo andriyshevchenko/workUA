@@ -14,3 +14,15 @@ screenshots/
 *.pdf
 resume_data/
 *.csv
+
+# Test coverage
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

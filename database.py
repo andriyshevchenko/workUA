@@ -26,6 +26,19 @@ class VacancyDatabase:
         else:
             self.logger.debug(f"✓ БД існує: {self.db_path}")
     
+    @staticmethod
+    def calculate_months_between(from_date: datetime, to_date: datetime) -> int:
+        """Calculate the number of months between two dates
+        
+        Args:
+            from_date: Earlier date
+            to_date: Later date
+            
+        Returns:
+            Number of months between the two dates
+        """
+        return (to_date.year - from_date.year) * 12 + (to_date.month - from_date.month)
+    
     def get_application(self, url: str) -> Optional[Dict[str, str]]:
         """Отримати запис про відгук за URL"""
         try:
@@ -101,7 +114,7 @@ class VacancyDatabase:
             # Парсимо дату
             date_applied = datetime.strptime(record['date_applied'], '%Y-%m-%d')
             now = datetime.now()
-            months_passed = (now.year - date_applied.year) * 12 + (now.month - date_applied.month)
+            months_passed = self.calculate_months_between(date_applied, now)
             
             can_apply = months_passed >= months_threshold
             if can_apply:
@@ -123,7 +136,7 @@ class VacancyDatabase:
         try:
             date_applied = datetime.strptime(record['date_applied'], '%Y-%m-%d')
             now = datetime.now()
-            months_passed = (now.year - date_applied.year) * 12 + (now.month - date_applied.month)
+            months_passed = self.calculate_months_between(date_applied, now)
             return months_passed
         except Exception:
             return None

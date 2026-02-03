@@ -56,7 +56,25 @@ class WorkUAScraper:
 
         # Load resume for LLM analysis
         if self.llm_service.use_llm:
-            resume_path = getattr(config, "RESUME_PATH", "resume_Osipov_Ernest.txt")
+            import os
+
+            # Use configured resume path, but fall back to the shipped .txt resume if missing
+            resume_path = getattr(config, "RESUME_PATH", "./my_resume.pdf")
+            if not os.path.exists(resume_path):
+                fallback_path = "resume_Osipov_Ernest.txt"
+                if os.path.exists(fallback_path):
+                    self.logger.warning(
+                        "Configured resume path '%s' not found, falling back to '%s'",
+                        resume_path,
+                        fallback_path,
+                    )
+                    resume_path = fallback_path
+                else:
+                    self.logger.warning(
+                        "Neither configured resume path '%s' nor fallback '%s' exist",
+                        resume_path,
+                        fallback_path,
+                    )
             self.llm_service.load_resume(resume_path)
 
     async def start(self, headless: bool = False):
@@ -261,8 +279,8 @@ class WorkUAScraper:
 
             print("💾 Cookies збережено")
             return True
-        except Exception:
-            print("⏱️ Час вичерпано. Авторизуйтесь пізніше.")
+        except Exception as e:
+            print(f"⏱️ Час вичерпано: {e}")
             return False
 
     async def search_jobs(

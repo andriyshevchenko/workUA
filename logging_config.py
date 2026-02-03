@@ -11,6 +11,12 @@ def setup_logging() -> logging.Logger:
     Returns:
         Configured root logger
     """
+    logger = logging.getLogger()
+
+    # Check if handlers are already configured to avoid duplicates
+    if logger.handlers:
+        return logger
+
     log_dir = Path("logs")
     log_dir.mkdir(exist_ok=True)
 
@@ -32,7 +38,6 @@ def setup_logging() -> logging.Logger:
     file_handler.setFormatter(formatter)
 
     # Configure root logger
-    logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)

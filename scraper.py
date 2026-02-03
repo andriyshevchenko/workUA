@@ -3,14 +3,19 @@ import asyncio
 import random
 from playwright.async_api import async_playwright, Page, Browser
 from playwright_stealth import Stealth
-from typing import Optional, List, Dict
+from typing import Optional, List
 from dataclasses import dataclass
-from config import config
-from human_behavior import HumanBehavior
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse, quote_plus
 import json
 import os
+import logging
+
+from config import config
+from human_behavior import HumanBehavior
 from database import VacancyDatabase
+from selectors import WorkUASelectors, UserAgents
+from anti_detection import BrowserAntiDetection
+from llm_service import LLMAnalysisService
 
 
 @dataclass
@@ -43,156 +48,72 @@ class WorkUAScraper:
         self.is_logged_in = False
         self.applied_jobs = set()  # Множина URL вакансій на які вже відгукнулись
         self.db = VacancyDatabase()  # База даних відгуків
+        self.llm_service = LLMAnalysisService()  # LLM analysis service
         
         # Ініціалізація логера
-        import logging
         self.logger = logging.getLogger(__name__)
+        
+        # Load resume for LLM analysis
+        if self.llm_service.use_llm:
+            resume_path = getattr(config, 'RESUME_PATH', 'resume_Osipov_Ernest.txt')
+            self.llm_service.load_resume(resume_path)
         
     async def start(self, headless: bool = False):
         """Запустити браузер з stealth режимом та реалістичними налаштуваннями"""
         self.playwright = await async_playwright().start()
         
-        # Реалістичні User-Agent варіанти
-        user_agents = [
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36',
-        ]
+        # Launch browser with anti-detection
+        self.browser = await self._launch_browser(headless)
         
-        # Запустити браузер з анти-детекцією
-        self.browser = await self.playwright.chromium.launch(
-            headless=headless,
-            args=[
-                '--disable-blink-features=AutomationControlled',
-                '--disable-dev-shm-usage',
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-web-security',
-                '--disable-features=IsolateOrigins,site-per-process',
-                '--start-maximized',  # Максимізувати вікно
-            ]
-        )
-        
-        # Створити реалістичний контекст з меншим viewport
-        self.context = await self.browser.new_context(
-            no_viewport=True,  # Дозволити браузеру використовувати повний розмір вікна
-            locale='uk-UA',
-            timezone_id='Europe/Kyiv',
-            user_agent=random.choice(user_agents),
-            permissions=['geolocation'],
-            geolocation={'latitude': 50.4501, 'longitude': 30.5234},  # Київ
-            color_scheme='light',
-            has_touch=False,
-            is_mobile=False,
-        )
-        
+        # Create realistic context
+        self.context = await self._create_browser_context()
         self.page = await self.context.new_page()
         
-        # Застосувати stealth режим через клас Stealth
-        stealth = Stealth()
-        await stealth.apply_stealth_async(self.context)
+        # Apply stealth mode
+        await self._apply_stealth_mode()
         
-        # Додаткові потужні скрипти для обходу FRONTEND детекції
-        await self.page.add_init_script("""
-            // 1. Видалити webdriver property
-            Object.defineProperty(navigator, 'webdriver', {
-                get: () => undefined
-            });
-            
-            // 2. Замаскувати chrome
-            window.chrome = {
-                runtime: {},
-                loadTimes: function() {},
-                csi: function() {},
-                app: {}
-            };
-            
-            // 3. Permissions API
-            const originalQuery = window.navigator.permissions.query;
-            window.navigator.permissions.query = (parameters) => (
-                parameters.name === 'notifications' ?
-                    Promise.resolve({ state: Notification.permission }) :
-                    originalQuery(parameters)
-            );
-            
-            // 4. Plugins - зробити реалістичним
-            Object.defineProperty(navigator, 'plugins', {
-                get: () => [1, 2, 3, 4, 5]
-            });
-            
-            // 5. Languages
-            Object.defineProperty(navigator, 'languages', {
-                get: () => ['uk-UA', 'uk', 'en-US', 'en']
-            });
-            
-            // 6. Platform
-            Object.defineProperty(navigator, 'platform', {
-                get: () => 'Win32'
-            });
-            
-            // 7. Видалити __playwright та __pw_manual
-            delete window.__playwright;
-            delete window.__pw_manual;
-            delete window.__PW_inspect;
-            
-            // 8. Видалити playwright з driver
-            Object.defineProperty(navigator, 'driver', {
-                get: () => undefined
-            });
-            
-            // 9. Battery API - зробити realistic
-            Object.defineProperty(navigator, 'getBattery', {
-                get: () => async () => ({
-                    charging: true,
-                    chargingTime: 0,
-                    dischargingTime: Infinity,
-                    level: 1
-                })
-            });
-            
-            // 10. Connection API
-            Object.defineProperty(navigator, 'connection', {
-                get: () => ({
-                    effectiveType: '4g',
-                    downlink: 10,
-                    rtt: 50
-                })
-            });
-            
-            // 11. Hardware Concurrency
-            Object.defineProperty(navigator, 'hardwareConcurrency', {
-                get: () => 8
-            });
-            
-            // 12. Memory (якщо є)
-            if ('deviceMemory' in navigator) {
-                Object.defineProperty(navigator, 'deviceMemory', {
-                    get: () => 8
-                });
-            }
-            
-            // 13. Приховати automation-controlled
-            const originalEval = window.eval;
-            window.eval = function() {
-                return originalEval.apply(this, arguments);
-            };
-            
-            // 14. toString override
-            window.eval.toString = () => 'function eval() { [native code] }';
-        """)
-        
-        # Завантажити збережені cookies якщо є
+        # Load cookies if available
         cookies_loaded = await self.load_cookies()
         if cookies_loaded:
             print("🍪 Cookies завантажено, перевіряю авторизацію...")
-            # Перевіряємо чи cookies ще валідні
             is_logged_in = await self.check_login_status()
             if not is_logged_in:
                 print("⚠️ Cookies застаріли, спробую авторизуватись знову...")
                 await self.auto_login()
         else:
-            # Спробувати авторизуватись
             await self.auto_login()
+    
+    async def _launch_browser(self, headless: bool) -> Browser:
+        """Launch browser with anti-detection settings
+        
+        Args:
+            headless: Whether to run in headless mode
+            
+        Returns:
+            Browser instance
+        """
+        return await self.playwright.chromium.launch(
+            headless=headless, args=BrowserAntiDetection.BROWSER_ARGS
+        )
+    
+    async def _create_browser_context(self):
+        """Create browser context with realistic settings
+        
+        Returns:
+            Browser context
+        """
+        context_config = BrowserAntiDetection.CONTEXT_CONFIG.copy()
+        context_config['user_agent'] = random.choice(UserAgents.CHROME_AGENTS)
+        return await self.browser.new_context(**context_config)
+    
+    async def _apply_stealth_mode(self):
+        """Apply stealth mode to avoid detection"""
+        # Apply stealth through Stealth class
+        stealth = Stealth()
+        await stealth.apply_stealth_async(self.context)
+        
+        # Add powerful anti-detection scripts
+        await self.page.add_init_script(BrowserAntiDetection.get_init_script())
         
     async def close(self):
         """Закрити браузер"""
@@ -230,82 +151,14 @@ class WorkUAScraper:
             return True
         return False
     
-    async def analyze_job_match_with_llm(self, job_description: str) -> tuple[int, str]:
-        """Аналіз відповідності вакансії резюме через LLM
-        
-        Returns:
-            tuple[int, str]: (ймовірність прийняття 0-100%, пояснення)
-        """
-        try:
-            # Читаємо резюме
-            if not os.path.exists(config.RESUME_PATH):
-                print("⚠️ Резюме не знайдено")
-                return (50, "Резюме не знайдено для порівняння")
-            
-            with open(config.RESUME_PATH, 'r', encoding='utf-8') as f:
-                resume = f.read()
-            
-            # Промпт для LLM
-            prompt = f"""Проаналізуй наскільки моє резюме підходить для цієї вакансії.
-
-МОЄ РЕЗЮМЕ:
-{resume}
-
-ОПИС ВАКАНСІЇ:
-{job_description}
-
-Дай відповідь у форматі:
-ЙМОВІРНІСТЬ: [число від 0 до 100]%
-ПОЯСНЕННЯ: [коротке пояснення чому саме така ймовірність]
-
-Враховуй:
-- Відповідність навичок і досвіду
-- Відповідність вимог до освіти
-- Відповідність знання мов
-- Чи може досвід компенсувати відсутність формальних вимог
-"""
-            
-            # Викликаємо OpenAI API напряму
-            import openai
-            openai.api_key = config.OPENAI_API_KEY
-            
-            response = openai.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "system", "content": "Ти експерт з підбору персоналу та аналізу резюме."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.3,
-                max_tokens=500
-            )
-            
-            result = response.choices[0].message.content
-            
-            # Парсимо відповідь
-            import re
-            probability_match = re.search(r'ЙМОВІРНІСТЬ:\s*(\d+)', result)
-            explanation_match = re.search(r'ПОЯСНЕННЯ:\s*(.+)', result, re.DOTALL)
-            
-            if probability_match:
-                probability = int(probability_match.group(1))
-                explanation = explanation_match.group(1).strip() if explanation_match else result
-                return (probability, explanation)
-            else:
-                # Якщо не вдалось розпарсити, повертаємо дефолтні значення
-                return (50, result)
-                
-        except Exception as e:
-            print(f"⚠️ Помилка LLM аналізу: {e}")
-            return (50, f"Помилка аналізу: {e}")
-        
     async def check_login_status(self) -> bool:
         """Перевірити чи користувач авторизований"""
-        await self.page.goto(config.WORKUA_BASE_URL)
+        await self.page.goto(WorkUASelectors.BASE_URL)
         await self._wait_for_page_load()
         
-        # Шукаємо посилання "Мій розділ" - якщо є, то авторизовані
+        # Look for "My Section" link - if exists, then authorized
         try:
-            my_section = self.page.locator('a:has-text("Мій розділ")')
+            my_section = self.page.locator(WorkUASelectors.MY_SECTION_LINK)
             is_visible = await my_section.count() > 0
             self.is_logged_in = is_visible
         except:
@@ -322,81 +175,95 @@ class WorkUAScraper:
             return False
             
         try:
-            # Перейти на сторінку логіну для шукачів роботи
-            await self.page.goto("https://www.work.ua/jobseeker/login/")
+            # Go to login page for job seekers
+            await self.page.goto(WorkUASelectors.LOGIN_URL)
             await self._wait_for_page_load()
             
-            # Якщо перенаправило на особистий розділ - вже авторизовані
+            # If redirected to personal section - already authorized
             if '/jobseeker/my/' in self.page.url:
                 print("✅ Вже авторизовано!")
                 self.is_logged_in = True
                 await self.save_cookies()
                 return True
             
-            # Невеликий рух миші як людина
+            # Random mouse movement like a human
             await HumanBehavior.random_mouse_movement(self.page, num_movements=2)
             
-            # Знайти поле для номера телефону (type="text", id="phone")
+            # Find phone number field
             print(f"📱 Вводжу номер: {config.WORKUA_PHONE}")
-            phone_input = self.page.locator('#phone')
+            phone_input = self.page.locator(WorkUASelectors.PHONE_INPUT)
             
             if await phone_input.count() == 0:
                 print("❌ Не знайдено поле для введення телефону")
                 return False
             
-            # Ввести номер телефону як людина
-            await phone_input.click()
-            await HumanBehavior.random_delay(0.3, 0.6)
+            # Enter phone number like a human
+            await self._enter_phone_number(phone_input)
             
-            # Очистити поле спочатку (Ctrl+A + Delete)
-            await phone_input.press('Control+A')
-            await phone_input.press('Backspace')
-            await HumanBehavior.random_delay(0.2, 0.4)
-            
-            # Посимвольне введення для обходу маски
-            for char in config.WORKUA_PHONE:
-                await phone_input.type(char, delay=random.uniform(50, 150))
-            
-            await HumanBehavior.random_delay(0.5, 0.9)
-            
-            # Пауза перед кліком на кнопку
-            await HumanBehavior.random_delay(0.7, 1.2)
-            
-            # Натиснути "Увійти" або "Отримати код"
-            submit_button = self.page.locator('button[type="submit"]')
+            # Click "Login" or "Get code"
+            submit_button = self.page.locator(WorkUASelectors.SUBMIT_BUTTON)
             if await submit_button.count() > 0:
                 await HumanBehavior.click_with_human_behavior(
                     self.page,
-                    'button[type="submit"]',
+                    WorkUASelectors.SUBMIT_BUTTON,
                     scroll_into_view=False
                 )
             
             print("\n⏳ Очікую введення SMS коду (60 секунд)...")
             print("👉 Введіть код на сайті вручну!\n")
             
-            # Чекаємо авторизації (перенаправлення на /jobseeker/my/)
-            try:
-                await self.page.wait_for_url(
-                    lambda url: '/jobseeker/my/' in url.lower() or 'login' not in url.lower(), 
-                    timeout=60000
-                )
-                print("✅ Авторизація успішна!")
-                
-                # Додаткова затримка для стабілізації session
-                await asyncio.sleep(2)
-                
-                # Зберегти cookies
-                await self.save_cookies()
-                self.is_logged_in = True
-                
-                print("💾 Cookies збережено")
-                return True
-            except:
-                print("⏱️ Час вичерпано. Авторизуйтесь пізніше.")
-                return False
+            # Wait for authorization (redirect to /jobseeker/my/)
+            return await self._wait_for_authorization()
             
         except Exception as e:
             print(f"❌ Помилка авторизації: {e}")
+            return False
+    
+    async def _enter_phone_number(self, phone_input):
+        """Enter phone number with human-like behavior
+        
+        Args:
+            phone_input: Phone input locator
+        """
+        await phone_input.click()
+        await HumanBehavior.random_delay(0.3, 0.6)
+        
+        # Clear field first (Ctrl+A + Delete)
+        await phone_input.press('Control+A')
+        await phone_input.press('Backspace')
+        await HumanBehavior.random_delay(0.2, 0.4)
+        
+        # Character-by-character input to bypass mask
+        for char in config.WORKUA_PHONE:
+            await phone_input.type(char, delay=random.uniform(50, 150))
+        
+        await HumanBehavior.random_delay(0.5, 0.9)
+        await HumanBehavior.random_delay(0.7, 1.2)
+    
+    async def _wait_for_authorization(self) -> bool:
+        """Wait for authorization to complete
+        
+        Returns:
+            True if authorization successful, False otherwise
+        """
+        try:
+            await self.page.wait_for_url(
+                lambda url: '/jobseeker/my/' in url.lower() or 'login' not in url.lower(), 
+                timeout=60000
+            )
+            print("✅ Авторизація успішна!")
+            
+            # Additional delay for session stabilization
+            await asyncio.sleep(2)
+            
+            # Save cookies
+            await self.save_cookies()
+            self.is_logged_in = True
+            
+            print("💾 Cookies збережено")
+            return True
+        except:
+            print("⏱️ Час вичерпано. Авторизуйтесь пізніше.")
             return False
         
     async def search_jobs(
@@ -446,9 +313,9 @@ class WorkUAScraper:
                     await HumanBehavior.random_mouse_movement(self.page, num_movements=1)
                     print(f"✅ [REMOTE] Готово до парсингу. URL: {self.page.url}")
                 else:
-                    print(f"🌐 [FORM] Перехід на сторінку пошуку: {config.WORKUA_SEARCH_URL}")
+                    print(f"🌐 [FORM] Перехід на сторінку пошуку: {WorkUASelectors.SEARCH_URL}")
                     # Для звичайного пошуку використовуємо форму
-                    await self.page.goto(config.WORKUA_SEARCH_URL)
+                    await self.page.goto(WorkUASelectors.SEARCH_URL)
                     await self._wait_for_page_load()
                     
                     # Заповнюємо форму
@@ -456,7 +323,7 @@ class WorkUAScraper:
                     await HumanBehavior.random_mouse_movement(self.page, num_movements=2)
                     
                     # Знайти поле пошуку та очистити його
-                    search_input = self.page.locator('input[name="search"], input[placeholder*="Посада"]').first
+                    search_input = self.page.locator(WorkUASelectors.SEARCH_INPUT).first
                     await search_input.click()
                     await HumanBehavior.random_delay(0.3, 0.5)
                     
@@ -476,7 +343,7 @@ class WorkUAScraper:
                         # Для звичайного пошуку вказуємо місто
                         await HumanBehavior.random_delay(0.3, 0.7)
                         
-                        location_input = self.page.locator('input[placeholder*="Місто"]').first
+                        location_input = self.page.locator(WorkUASelectors.LOCATION_INPUT).first
                         await location_input.click()
                         await HumanBehavior.random_delay(0.2, 0.4)
                         
@@ -497,7 +364,7 @@ class WorkUAScraper:
                     # Клік на кнопку пошуку
                     await HumanBehavior.click_with_human_behavior(
                         self.page,
-                        'button[type="submit"], button:has-text("Знайти")',
+                        WorkUASelectors.SEARCH_BUTTON,
                         scroll_into_view=False
                     )
                     await self._wait_for_page_load()
@@ -576,7 +443,7 @@ class WorkUAScraper:
                         continue
                         
                     if url and not url.startswith('http'):
-                        url = config.WORKUA_BASE_URL + url
+                        url = WorkUASelectors.BASE_URL + url
                     
                     title = await link.text_content()
                     self.logger.debug(f"✅ Вакансія: {title}")
@@ -620,7 +487,7 @@ class WorkUAScraper:
                 return None
             url = await link.get_attribute('href')
             if url and not url.startswith('http'):
-                url = config.WORKUA_BASE_URL + url
+                url = WorkUASelectors.BASE_URL + url
                 
             # Назва
             title_elem = await element.query_selector('h2, .card-title, [class*="title"]')
@@ -715,7 +582,7 @@ class WorkUAScraper:
             # ПЕРЕВІРКА 2: Сторінка вакансії - чи є мітка "Ви вже відгукалися"
             self.logger.debug("🔍 Перевірка чи є відгук на сторінці...")
             # Шукаємо параграф з текстом "Ви вже відгукалися на цю вакансію"
-            already_sent = self.page.locator('p:has-text("Ви вже відгукалися")')
+            already_sent = self.page.locator(WorkUASelectors.ALREADY_APPLIED_TEXT)
             
             can_reapply = True  # За замовчуванням можна відгукуватись
             
@@ -763,8 +630,8 @@ class WorkUAScraper:
                     if await main_content.count() > 0:
                         job_text = await main_content.text_content()
                         
-                        # Аналізуємо через LLM
-                        probability, explanation = await self.analyze_job_match_with_llm(job_text)
+                        # Analyze through LLM
+                        probability, explanation = self.llm_service.analyze_job_match(job_text)
                         self.logger.debug(f"📊 Ймовірність прийняття: {probability}%")
                         self.logger.debug(f"💭 {explanation}")
                         
@@ -788,12 +655,12 @@ class WorkUAScraper:
             
             # Клік на кнопку "Відгукнутися" або "Переглянути резюме" (якщо вже відгукувались)
             self.logger.debug("🖱️ Шукаю кнопку відгуку...")
-            apply_button = self.page.locator('button:has-text("Відгукнутися")').first
+            apply_button = self.page.locator(WorkUASelectors.APPLY_BUTTON).first
             
             # Якщо не знайдено "Відгукнутися", шукаємо "Переглянути резюме" (для повторного відгуку)
             if await apply_button.count() == 0:
                 self.logger.debug("🔄 Кнопка 'Відгукнутися' не знайдена, шукаю 'Переглянути резюме'...")
-                apply_button = self.page.locator('button:has-text("Переглянути резюме")').first
+                apply_button = self.page.locator(WorkUASelectors.REVIEW_RESUME_BUTTON).first
                 
                 if await apply_button.count() == 0:
                     self.logger.debug("❌ Не знайдено жодної кнопки для відгуку")
@@ -835,7 +702,7 @@ class WorkUAScraper:
             
             # Перевіряємо чи з'явилось модальне вікно з вибором резюме
             # Якщо користувач залогінений, повинна з'явитись кнопка "Надіслати"
-            send_button = self.page.locator('button:has-text("Надіслати"), button:has-text("Продовжити")')
+            send_button = self.page.locator(WorkUASelectors.SEND_BUTTON)
             if await send_button.count() == 0:
                 self.logger.debug("⚠️ Не знайдено кнопку відправки резюме")
                 return False
@@ -846,7 +713,7 @@ class WorkUAScraper:
             await HumanBehavior.random_delay(0.5, 1.0)
             
             # Перевіряємо чи з'явився діалог підтвердження повторного відгуку
-            confirm_reapply = self.page.locator('button:has-text("Так, відгукнутися")')
+            confirm_reapply = self.page.locator(WorkUASelectors.CONFIRM_REAPPLY_BUTTON)
             if await confirm_reapply.count() > 0:
                 self.logger.debug("🔄 Підтвердження повторного відгуку...")
                 await confirm_reapply.first.click()
@@ -857,7 +724,7 @@ class WorkUAScraper:
             
             # Може з'явитися додатковий діалог про додавання локації
             await HumanBehavior.random_delay(0.5, 1.0)
-            not_add_button = self.page.locator('button:has-text("Не додавати")')
+            not_add_button = self.page.locator(WorkUASelectors.NOT_ADD_BUTTON)
             if await not_add_button.count() > 0:
                 self.logger.debug("🖱️ Закриваю діалог локації...")
                 await not_add_button.first.click()
@@ -872,7 +739,7 @@ class WorkUAScraper:
                 success = True
             elif await self.page.locator('text=успішно, text=Дякуємо, text=відгукнулись').count() > 0:
                 success = True
-            elif await self.page.locator('button:has-text("Переглянути резюме")').count() > 0:
+            elif await self.page.locator(WorkUASelectors.REVIEW_RESUME_BUTTON).count() > 0:
                 success = True
             
             if success:

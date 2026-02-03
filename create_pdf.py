@@ -3,6 +3,7 @@
 """
 import markdown
 from pathlib import Path
+from utils import separator_line
 
 def markdown_to_html(md_file: str, html_file: str):
     """Конвертує Markdown в HTML з гарним стилем"""
@@ -205,7 +206,6 @@ if __name__ == "__main__":
     print("🔄 Конвертую Markdown в HTML...")
     html_path = markdown_to_html(md_file, html_file)
     
-    from utils import separator_line
     print("\n" + separator_line())
     print("✅ HTML файл створено!")
     print(separator_line())

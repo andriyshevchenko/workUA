@@ -2,10 +2,36 @@
 
 import json
 import logging
+import os
 import re
 from typing import Optional, Tuple
-from openai import OpenAI
+from openai import AsyncOpenAI
 from config import config
+
+
+def resolve_resume_path() -> str:
+    """Resolve resume path with fallback to bundled resume
+
+    Returns:
+        Path to resume file (configured or fallback)
+    """
+    resume_path = getattr(config, "RESUME_PATH", "./my_resume.pdf")
+    if not os.path.exists(resume_path):
+        fallback_path = "resume_Osipov_Ernest.txt"
+        if os.path.exists(fallback_path):
+            logging.getLogger(__name__).warning(
+                "Configured resume path '%s' not found, using bundled '%s'",
+                resume_path,
+                fallback_path,
+            )
+            return fallback_path
+        else:
+            logging.getLogger(__name__).warning(
+                "Neither configured resume path '%s' nor fallback '%s' exist",
+                resume_path,
+                fallback_path,
+            )
+    return resume_path
 
 
 class LLMAnalysisService:
@@ -14,13 +40,13 @@ class LLMAnalysisService:
     def __init__(self):
         """Initialize the LLM analysis service"""
         self.logger = logging.getLogger(__name__)
-        self.client: Optional[OpenAI] = None
+        self.client: Optional[AsyncOpenAI] = None
         self.use_llm = False
         self.resume_text = ""
 
         if config.OPENAI_API_KEY and hasattr(config, "USE_LLM") and config.USE_LLM:
             try:
-                self.client = OpenAI(api_key=config.OPENAI_API_KEY)
+                self.client = AsyncOpenAI(api_key=config.OPENAI_API_KEY)
                 self.use_llm = True
                 self.logger.info("✅ LLM analysis enabled (GPT-4o)")
             except Exception as e:
@@ -61,7 +87,7 @@ class LLMAnalysisService:
             self.resume_text = fallback_resume
             return fallback_resume
 
-    def analyze_job(
+    async def analyze_job(
         self,
         job_title: str,
         company: str,
@@ -88,7 +114,7 @@ class LLMAnalysisService:
         try:
             prompt = self._build_analysis_prompt(job_title, company, location, salary, description)
 
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
                     {
@@ -159,7 +185,7 @@ RESPONSE FORMAT (JSON):
 }}
 """
 
-    def analyze_job_match(self, job_description: str) -> Tuple[int, str]:
+    async def analyze_job_match(self, job_description: str) -> Tuple[int, str]:
         """Analyze job match probability with LLM
 
         Args:
@@ -191,7 +217,7 @@ Consider:
 - Whether experience can compensate for missing formal requirements
 """
 
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
                     {

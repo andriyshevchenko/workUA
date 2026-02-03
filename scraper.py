@@ -56,23 +56,9 @@ class WorkUAScraper:
 
         # Load resume for LLM analysis
         if self.llm_service.use_llm:
-            # Use configured resume path, but fall back to the shipped .txt resume if missing
-            resume_path = getattr(config, "RESUME_PATH", "./my_resume.pdf")
-            if not os.path.exists(resume_path):
-                fallback_path = "resume_Osipov_Ernest.txt"
-                if os.path.exists(fallback_path):
-                    self.logger.warning(
-                        "Configured resume path '%s' not found, falling back to '%s'",
-                        resume_path,
-                        fallback_path,
-                    )
-                    resume_path = fallback_path
-                else:
-                    self.logger.warning(
-                        "Neither configured resume path '%s' nor fallback '%s' exist",
-                        resume_path,
-                        fallback_path,
-                    )
+            from llm_service import resolve_resume_path
+
+            resume_path = resolve_resume_path()
             self.llm_service.load_resume(resume_path)
 
     async def start(self, headless: bool = False):
@@ -262,23 +248,34 @@ class WorkUAScraper:
             True if authorization successful, False otherwise
         """
         try:
-            await self.page.wait_for_url(
-                lambda url: "/jobseeker/my/" in url.lower() or "login" not in url.lower(),
-                timeout=60000,
-            )
-            print("✅ Авторизація успішна!")
+            # Poll for successful authorization by checking URL
+            timeout_ms = 60000
+            check_interval_sec = 0.5
+            deadline = asyncio.get_event_loop().time() + timeout_ms / 1000
 
-            # Additional delay for session stabilization
-            await asyncio.sleep(2)
+            while True:
+                current_url = self.page.url.lower()
+                if "/jobseeker/my/" in current_url or "login" not in current_url:
+                    print("✅ Авторизація успішна!")
 
-            # Save cookies
-            await self.save_cookies()
-            self.is_logged_in = True
+                    # Additional delay for session stabilization
+                    await asyncio.sleep(2)
 
-            print("💾 Cookies збережено")
-            return True
+                    # Save cookies
+                    await self.save_cookies()
+                    self.is_logged_in = True
+
+                    print("💾 Cookies збережено")
+                    return True
+
+                if asyncio.get_event_loop().time() >= deadline:
+                    print("⏱️ Час вичерпано: не вдалося дочекатися авторизації")
+                    return False
+
+                await asyncio.sleep(check_interval_sec)
+
         except Exception as e:
-            print(f"⏱️ Час вичерпано: {e}")
+            print(f"⏱️ Помилка авторизації: {e}")
             return False
 
     async def search_jobs(
@@ -299,8 +296,8 @@ class WorkUAScraper:
             target_jobs: Ціль кількості вакансій (зупинимось коли досягнемо)
         """
         jobs = []
-        self.logger.info(f"� Пошук за запитом: {keyword}")
-        self.logger.info(f"�🔄 Початок сканування до {max_pages} сторінок...")
+        self.logger.info(f"🔍 Пошук за запитом: {keyword}")
+        self.logger.info(f"🔄 Початок сканування до {max_pages} сторінок...")
 
         for page_num in range(1, max_pages + 1):
             self.logger.info(f"📄 Обробка сторінки {page_num}/{max_pages}...")
@@ -447,7 +444,9 @@ class WorkUAScraper:
         try:
             # Всі заголовки h2 на сторінці - це вакансії
             self.logger.debug("🔍 Пошук заголовків h2 (role=heading, level=2)...")
-            job_headings = await self.page.get_by_role("heading", level=2).all()
+            job_headings = await self.page.get_by_role(
+                "heading", level=WorkUASelectors.JOB_HEADINGS_LEVEL
+            ).all()
             self.logger.info(f"📊 Знайдено {len(job_headings)} заголовків h2 на сторінці")
 
             for idx, heading in enumerate(job_headings, 1):
@@ -545,7 +544,7 @@ class WorkUAScraper:
         """Перевірити чи є наступна сторінка"""
         try:
             # Шукаємо посилання з rel="next"
-            next_link = self.page.locator('a[rel="next"]')
+            next_link = self.page.locator(WorkUASelectors.NEXT_PAGE_LINK)
             return await next_link.count() > 0
         except Exception:
             return False
@@ -663,7 +662,9 @@ class WorkUAScraper:
                         job_text = await main_content.text_content()
 
                         # Analyze through LLM
-                        probability, explanation = self.llm_service.analyze_job_match(job_text)
+                        probability, explanation = await self.llm_service.analyze_job_match(
+                            job_text
+                        )
                         self.logger.debug(f"📊 Ймовірність прийняття: {probability}%")
                         self.logger.debug(f"💭 {explanation}")
 
@@ -776,7 +777,9 @@ class WorkUAScraper:
             if "/sent/" in self.page.url:
                 success = True
             elif (
-                await self.page.locator("text=успішно, text=Дякуємо, text=відгукнулись").count() > 0
+                await self.page.locator("text=успішно").count() > 0
+                or await self.page.locator("text=Дякуємо").count() > 0
+                or await self.page.locator("text=відгукнулись").count() > 0
             ):
                 success = True
             elif await self.page.locator(WorkUASelectors.REVIEW_RESUME_BUTTON).count() > 0:

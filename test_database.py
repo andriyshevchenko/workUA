@@ -97,7 +97,10 @@ class TestVacancyDatabase:
         
         # Add application from 1 month ago
         one_month_ago = datetime.now()
-        one_month_ago = one_month_ago.replace(month=one_month_ago.month - 1)
+        if one_month_ago.month == 1:
+            one_month_ago = one_month_ago.replace(year=one_month_ago.year - 1, month=12)
+        else:
+            one_month_ago = one_month_ago.replace(month=one_month_ago.month - 1)
         date = one_month_ago.strftime('%Y-%m-%d')
         
         temp_db.add_or_update(url, date, "Test Job", "Test Company")

@@ -17,8 +17,8 @@ class WorkUABot:
         self.scraper = None
         self.llm_service = LLMAnalysisService()
         
-        # Load resume
-        resume_path = "resume_Osipov_Ernest.txt"
+        # Load resume from config or default path
+        resume_path = getattr(config, 'RESUME_PATH', 'resume_Osipov_Ernest.txt')
         self.llm_service.load_resume(resume_path)
     
     def analyze_job(self, job: JobListing) -> tuple[bool, int, str]:

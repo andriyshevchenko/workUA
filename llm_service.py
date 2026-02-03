@@ -1,6 +1,7 @@
 """Service for LLM-based job analysis"""
 import json
 import logging
+import re
 from typing import Optional, Tuple
 from openai import OpenAI
 from config import config
@@ -207,8 +208,6 @@ Consider:
             result = response.choices[0].message.content
 
             # Parse the response
-            import re
-
             probability_match = re.search(r'PROBABILITY:\s*(\d+)', result)
             explanation_match = re.search(r'EXPLANATION:\s*(.+)', result, re.DOTALL)
 

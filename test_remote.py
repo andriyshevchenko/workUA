@@ -2,6 +2,7 @@
 import asyncio
 from scraper import WorkUAScraper
 from config import config
+from utils import separator_line
 
 
 async def test_remote_search():
@@ -10,9 +11,9 @@ async def test_remote_search():
     scraper = WorkUAScraper()
     await scraper.start(headless=False)
     
-    print("\n" + "="*60)
+    print("\n" + separator_line())
     print("🧪 ТЕСТ: Пошук ДИСТАНЦІЙНИХ вакансій (remote=True)")
-    print("="*60 + "\n")
+    print(separator_line() + "\n")
     
     jobs = await scraper.search_jobs(
         keyword="python developer",
@@ -29,9 +30,9 @@ async def test_remote_search():
         print(f"   🔗 {job.url}")
         print()
     
-    print("\n" + "="*60)
+    print("\n" + separator_line())
     print("🧪 ТЕСТ: Пошук ЗВИЧАЙНИХ вакансій (remote=False)")
-    print("="*60 + "\n")
+    print(separator_line() + "\n")
     
     jobs_normal = await scraper.search_jobs(
         keyword="python developer",
@@ -51,9 +52,9 @@ async def test_remote_search():
     
     await scraper.close()
     
-    print("\n" + "="*60)
+    print("\n" + separator_line())
     print("✨ ТЕСТ ЗАВЕРШЕНО")
-    print("="*60)
+    print(separator_line())
 
 
 if __name__ == "__main__":

@@ -205,9 +205,10 @@ if __name__ == "__main__":
     print("🔄 Конвертую Markdown в HTML...")
     html_path = markdown_to_html(md_file, html_file)
     
-    print("\n" + "="*60)
+    from utils import separator_line
+    print("\n" + separator_line())
     print("✅ HTML файл створено!")
-    print("="*60)
+    print(separator_line())
     print(f"\n📄 Файл: {html_path}")
     print("\n💡 Як створити PDF:")
     print("   1. Відкрийте файл в браузері (Chrome або Edge)")
@@ -215,4 +216,4 @@ if __name__ == "__main__":
     print("   3. Оберіть 'Зберегти як PDF'")
     print("   4. Налаштуйте поля та масштаб")
     print("   5. Збережіть файл")
-    print("\n" + "="*60)
+    print("\n" + separator_line())

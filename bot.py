@@ -8,6 +8,7 @@ from typing import List, Optional
 from openai import OpenAI
 from scraper import WorkUAScraper, JobListing
 from config import config
+from utils import separator_line
 
 
 # Налаштування логування
@@ -147,9 +148,9 @@ class WorkUABot:
     
     async def run(self, max_applications: int = 10):
         """Запустити бот"""
-        self.logger.info("="*70)
+        self.logger.info(separator_line(70))
         self.logger.info("🤖 WORK.UA BOT - Автоматичний пошук роботи")
-        self.logger.info("="*70)
+        self.logger.info(separator_line(70))
         
         # Ініціалізація
         self.scraper = WorkUAScraper()
@@ -177,7 +178,7 @@ class WorkUABot:
         else:
             self.logger.info(f"📍 Локації: {', '.join(locations)}")
         self.logger.info(f"🎯 Мета: {max_applications} відгуків")
-        self.logger.info("="*70)
+        self.logger.info(separator_line(70))
         
         # Лічильники
         total_scanned = 0
@@ -194,7 +195,7 @@ class WorkUABot:
             self.logger.info(f"🔎 Ключові слова об'єднано: '{combined_keyword}'")
             self.logger.info(f"📊 Мета: {max_applications} відгуків")
             self.logger.info(f"📄 Сканування до {max_pages_to_scan} сторінок")
-            self.logger.info(f"{'='*70}")
+            self.logger.info(separator_line(70))
             
             # Цільова кількість вакансій (завжди x множник щоб мати великий запас)
             target_jobs = max_applications * config.VACANCY_MULTIPLIER
@@ -279,13 +280,13 @@ class WorkUABot:
         
         finally:
             # Фінальна статистика
-            self.logger.info("\n" + "="*70)
+            self.logger.info("\n" + separator_line(70))
             self.logger.info("📊 ПІДСУМКИ")
-            self.logger.info("="*70)
+            self.logger.info(separator_line(70))
             self.logger.info(f"🔍 Всього переглянуто: {total_scanned}")
             self.logger.info(f"✅ Відгукнулись: {total_applied}")
             self.logger.info(f"⏭️ Пропущено: {total_skipped}")
-            self.logger.info("="*70)
+            self.logger.info(separator_line(70))
             
             await self.scraper.close()
             self.logger.info("👋 Завершено!")

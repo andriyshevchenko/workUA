@@ -12,11 +12,8 @@ def print_section(title: str, width: int = 60):
         width: Width of the decorative line (default: 60)
     """
     print(f"\n{'='*width}")
-    if title:
-        print(title)
-        print(f"{'='*width}\n")
-    else:
-        print()
+    print(title)
+    print(f"{'='*width}\n")
 
 
 async def test_remote_search():

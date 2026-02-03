@@ -12,11 +12,8 @@ def print_section(title: str, width: int = 60):
         width: Width of the decorative line (default: 60)
     """
     print(f"\n{'='*width}")
-    if title:
-        print(title)
-        print(f"{'='*width}\n")
-    else:
-        print()
+    print(title)
+    print(f"{'='*width}\n")
 
 
 async def test_apply_workflow():
@@ -54,7 +51,6 @@ async def test_apply_workflow():
     print(f"   Компанія: {test_job.company}")
     print(f"   Локація: {test_job.location}")
     print(f"   URL: {test_job.url}")
-    print_section("")
     
     # Завантажуємо деталі
     print("📄 Завантаження деталей вакансії...\n")
@@ -66,9 +62,10 @@ async def test_apply_workflow():
         print(f"📝 Опис (перші 200 символів):\n{desc_preview}\n")
     
     # Питаємо користувача чи відгукуватися
-    print_section("❓ Відгукнутися на цю вакансію? (y/n): ", width=60)
-    response = input()
-    print_section("")
+    print('='*60)
+    response = input("❓ Відгукнутися на цю вакансію? (y/n): ")
+    print('='*60)
+    print()
     
     if response.lower() == 'y':
         print("🚀 Починаємо процес відгуку...\n")

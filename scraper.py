@@ -733,7 +733,7 @@ class WorkUAScraper:
                         day, month, year = date_match.groups()
                         applied_date = datetime(int(year), int(month), int(day))
                         now = datetime.now()
-                        months_passed = self.db._calculate_months_between(applied_date, now)
+                        months_passed = self.db.calculate_months_between(applied_date, now)
                         
                         self.logger.debug(f"📆 Дата відгуку: {applied_date.strftime('%d.%m.%Y')} (минуло {months_passed} міс.)")
                         

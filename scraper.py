@@ -13,7 +13,7 @@ import logging
 from config import config
 from human_behavior import HumanBehavior
 from database import VacancyDatabase
-from selectors import WorkUASelectors, UserAgents
+from ui_selectors import WorkUASelectors, UserAgents
 from anti_detection import BrowserAntiDetection
 from llm_service import LLMAnalysisService
 

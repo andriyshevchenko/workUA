@@ -2,7 +2,6 @@
 
 import asyncio
 import random
-import math
 from playwright.async_api import Page
 
 

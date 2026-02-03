@@ -1,7 +1,6 @@
 """База даних для відстеження вакансій на які вже відгукувались"""
 
 import csv
-import os
 from datetime import datetime
 from typing import Optional, Dict
 from pathlib import Path
@@ -51,7 +50,7 @@ class VacancyDatabase:
                             f"🔍 Знайдено в БД: {row['date_applied']} - {row['title']}"
                         )
                         return row
-            self.logger.debug(f"🔍 Не знайдено в БД")
+            self.logger.debug("🔍 Не знайдено в БД")
         except Exception as e:
             self.logger.debug(f"⚠️ Помилка читання БД: {e}")
         return None
@@ -107,7 +106,7 @@ class VacancyDatabase:
         """
         record = self.get_application(url)
         if not record:
-            self.logger.debug(f"✓ Немає в БД - можна відгукуватись")
+            self.logger.debug("✓ Немає в БД - можна відгукуватись")
             return True  # Немає в БД - можна відгукуватись
 
         try:

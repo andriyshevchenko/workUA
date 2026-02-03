@@ -1,7 +1,6 @@
 """Unit tests for llm_service module"""
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from llm_service import LLMAnalysisService
 
 

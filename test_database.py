@@ -2,7 +2,6 @@
 
 import pytest
 from datetime import datetime
-from pathlib import Path
 from database import VacancyDatabase
 
 

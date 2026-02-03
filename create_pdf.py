@@ -3,7 +3,6 @@
 """
 
 import markdown
-from pathlib import Path
 
 
 def markdown_to_html(md_file: str, html_file: str):

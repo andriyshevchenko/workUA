@@ -6,7 +6,6 @@ from playwright.async_api import async_playwright, Page, Browser
 from playwright_stealth import Stealth
 from typing import Optional, List
 from dataclasses import dataclass
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse, quote_plus
 import json
 import os
 import logging
@@ -163,7 +162,7 @@ class WorkUAScraper:
             my_section = self.page.locator(WorkUASelectors.MY_SECTION_LINK)
             is_visible = await my_section.count() > 0
             self.is_logged_in = is_visible
-        except:
+        except Exception:
             self.is_logged_in = False
 
         return self.is_logged_in
@@ -262,7 +261,7 @@ class WorkUAScraper:
 
             print("💾 Cookies збережено")
             return True
-        except:
+        except Exception:
             print("⏱️ Час вичерпано. Авторизуйтесь пізніше.")
             return False
 
@@ -305,10 +304,10 @@ class WorkUAScraper:
 
                     print(f"🌐 [REMOTE] Перехід на URL: {search_url}")
                     await self.page.goto(search_url)
-                    print(f"⏳ [REMOTE] Очікування завантаження сторінки...")
+                    print("⏳ [REMOTE] Очікування завантаження сторінки...")
                     await self._wait_for_page_load()
-                    print(f"✅ [REMOTE] Сторінка завантажена")
-                    print(f"🖱️ [REMOTE] Рух миші")
+                    print("✅ [REMOTE] Сторінка завантажена")
+                    print("🖱️ [REMOTE] Рух миші")
                     # Невеликий рух миші
                     await HumanBehavior.random_mouse_movement(self.page, num_movements=1)
                     print(f"✅ [REMOTE] Готово до парсингу. URL: {self.page.url}")
@@ -390,7 +389,7 @@ class WorkUAScraper:
             print(f"🔍 Пошук сторінка {page_num}: {self.page.url}")
 
             # Прокрутити сторінку вниз як людина читає
-            print(f"📜 Прокрутка сторінки...")
+            print("📜 Прокрутка сторінки...")
             await HumanBehavior.scroll_page_human_like(self.page, scroll_distance=500)
 
             # Парсимо вакансії на сторінці
@@ -425,13 +424,13 @@ class WorkUAScraper:
 
     async def _parse_search_results(self) -> List[JobListing]:
         """Парсинг результатів пошуку"""
-        self.logger.debug(f"📋 Початок _parse_search_results()")
+        self.logger.debug("📋 Початок _parse_search_results()")
         jobs = []
 
         # Використовуємо role selector для заголовків level=2 (це вакансії)
         try:
             # Всі заголовки h2 на сторінці - це вакансії
-            self.logger.debug(f"🔍 Пошук заголовків h2 (role=heading, level=2)...")
+            self.logger.debug("🔍 Пошук заголовків h2 (role=heading, level=2)...")
             job_headings = await self.page.get_by_role("heading", level=2).all()
             self.logger.info(f"📊 Знайдено {len(job_headings)} заголовків h2 на сторінці")
 
@@ -476,7 +475,7 @@ class WorkUAScraper:
                         salary=None,  # Завантажимо пізніше
                     )
                     jobs.append(job)
-                    print(f"✓ Додано в список")
+                    print("✓ Додано в список")
 
                 except Exception as e:
                     print(f"⚠️ Помилка парсингу вакансії: {e}")
@@ -532,7 +531,7 @@ class WorkUAScraper:
             # Шукаємо посилання з rel="next"
             next_link = self.page.locator('a[rel="next"]')
             return await next_link.count() > 0
-        except:
+        except Exception:
             return False
 
     async def get_job_details(self, job: JobListing) -> JobListing:
@@ -553,14 +552,14 @@ class WorkUAScraper:
                 job.description = job.description.strip()
                 # Імітація читання тексту
                 await HumanBehavior.reading_delay(len(job.description))
-        except:
+        except Exception:
             # Fallback - весь main
             try:
                 main_elem = self.page.locator("main").first
                 if await main_elem.count():
                     job.description = await main_elem.text_content()
                     job.description = job.description.strip()
-            except:
+            except Exception:
                 pass
 
         return job
@@ -595,8 +594,6 @@ class WorkUAScraper:
             self.logger.debug("🔍 Перевірка чи є відгук на сторінці...")
             # Шукаємо параграф з текстом "Ви вже відгукалися на цю вакансію"
             already_sent = self.page.locator(WorkUASelectors.ALREADY_APPLIED_TEXT)
-
-            can_reapply = True  # За замовчуванням можна відгукуватись
 
             if await already_sent.count() > 0:
                 try:
@@ -633,7 +630,6 @@ class WorkUAScraper:
                             self.logger.debug(
                                 f"🔄 Минуло {months_passed} міс. - можна відправити повторно"
                             )
-                            can_reapply = True
                     else:
                         self.logger.debug("⚠️ Не вдалось розпарсити дату, продовжую")
                 except Exception as e:
@@ -660,7 +656,7 @@ class WorkUAScraper:
                             self.applied_jobs.add(job.url)
                             return False
                         else:
-                            self.logger.debug(f"✓ Ймовірність достатня - продовжую відгук")
+                            self.logger.debug("✓ Ймовірність достатня - продовжую відгук")
                 except Exception as e:
                     self.logger.debug(f"⚠️ Помилка LLM аналізу: {e}, продовжую без перевірки")
 
@@ -779,7 +775,7 @@ class WorkUAScraper:
                 self.db.add_or_update(job.url, today, job.title, job.company)
                 self.logger.debug(f"💾 Збережено в БД: {today}")
             else:
-                self.logger.debug(f"⚠️ Невідомий статус відгуку - НЕ оновлюю БД")
+                self.logger.debug("⚠️ Невідомий статус відгуку - НЕ оновлюю БД")
 
             return success
 
@@ -814,7 +810,7 @@ async def test_scraper():
         # Отримати деталі першої вакансії
         if jobs:
             detailed_job = await scraper.get_job_details(jobs[0])
-            print(f"\n📝 Опис вакансії (перші 300 символів):")
+            print("\n📝 Опис вакансії (перші 300 символів):")
             print(detailed_job.description[:300] + "...")
 
     finally:

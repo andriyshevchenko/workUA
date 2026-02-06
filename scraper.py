@@ -149,31 +149,40 @@ class WorkUAScraper:
             
         Returns:
             True if cookies loaded successfully, False otherwise
+            
+        Raises:
+            ValueError: If WORKUA_COOKIES is set but invalid (fatal in CI/CD)
         """
-        try:
-            # Priority 1: Load from environment variable
-            if config.WORKUA_COOKIES:
+        # Priority 1: Load from environment variable
+        if config.WORKUA_COOKIES:
+            try:
                 self.logger.info("🍪 Loading cookies from WORKUA_COOKIES environment variable")
                 cookies = json.loads(config.WORKUA_COOKIES)
                 await self.context.add_cookies(cookies)
                 self.is_logged_in = True
                 return True
-            
-            # Priority 2: Load from file
-            if os.path.exists(filepath):
+            except Exception as e:
+                # If WORKUA_COOKIES is set but invalid, fail fast (don't fall back to phone login in CI)
+                raise ValueError(
+                    f"WORKUA_COOKIES is set but invalid: {e}. "
+                    "Fix the cookies JSON or remove the variable."
+                ) from e
+        
+        # Priority 2: Load from file
+        if os.path.exists(filepath):
+            try:
                 self.logger.info(f"🍪 Loading cookies from file: {filepath}")
                 with open(filepath, "r", encoding="utf-8") as f:
                     cookies = json.load(f)
                 await self.context.add_cookies(cookies)
                 self.is_logged_in = True
                 return True
-            
-            self.logger.info("ℹ️ No cookies found (neither in env var nor file)")
-            return False
-            
-        except Exception as e:
-            self.logger.warning(f"⚠️ Failed to load cookies: {e}")
-            return False
+            except Exception as e:
+                self.logger.warning(f"⚠️ Failed to load cookies from file: {e}")
+                return False
+        
+        self.logger.info("ℹ️ No cookies found (neither in env var nor file)")
+        return False
 
     async def check_login_status(self) -> bool:
         """Перевірити чи користувач авторизований"""

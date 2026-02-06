@@ -28,12 +28,9 @@ CREATE POLICY "Allow all for authenticated users" ON applied_jobs
     USING (auth.role() = 'authenticated')
     WITH CHECK (auth.role() = 'authenticated');
 
--- Alternatively, if using service role key (for GitHub Actions), allow anon access
--- Comment out the above policy and uncomment this one:
--- CREATE POLICY "Allow all for anon" ON applied_jobs
---     FOR ALL
---     USING (true)
---     WITH CHECK (true);
+-- For automation (e.g., GitHub Actions), prefer using a `service_role` key on the server side.
+-- The `service_role` key bypasses RLS, so keep RLS policies restrictive and avoid broad anon access.
+-- Do NOT enable anon access policies - use service_role key instead for CI/CD.
 
 -- Create function to automatically update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()

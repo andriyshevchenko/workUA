@@ -19,7 +19,7 @@ class TestVacancyDatabaseFactory:
     
     def test_factory_creates_csv_by_default(self):
         """Test factory creates CSV database when no env vars"""
-        with patch('config.config') as mock_config:
+        with patch('database.config') as mock_config:
             mock_config.SUPABASE_URL = None
             mock_config.SUPABASE_KEY = None
             
@@ -33,10 +33,17 @@ class TestVacancyDatabaseFactory:
         # Tested manually in integration tests
         pass
     
-    def test_factory_explicit_csv(self):
+    def test_factory_explicit_csv(self, tmp_path):
         """Test factory creates CSV when explicitly requested"""
-        db = VacancyDatabase.create('csv')
-        assert isinstance(db, CSVVacancyDatabase)
+        # Use tmp_path to avoid polluting workspace
+        with patch.object(CSVVacancyDatabase, '__init__', lambda self, path='applied_jobs.csv': None):
+            db = VacancyDatabase.create('csv')
+            assert isinstance(db, CSVVacancyDatabase)
+    
+    def test_factory_invalid_type(self):
+        """Test factory raises error for invalid db_type"""
+        with pytest.raises(ValueError, match="Unsupported db_type"):
+            VacancyDatabase.create('invalid_type')
 
 
 class TestCSVVacancyDatabase:
@@ -187,7 +194,7 @@ class TestSupabaseVacancyDatabase:
     
     def test_supabase_init_missing_config(self):
         """Test Supabase initialization fails without config"""
-        with patch('config.config') as mock_config:
+        with patch('database.config') as mock_config:
             mock_config.SUPABASE_URL = None
             mock_config.SUPABASE_KEY = None
             

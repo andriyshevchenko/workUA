@@ -20,6 +20,9 @@ class VacancyDatabase:
             
         Returns:
             Database instance (CSVVacancyDatabase or SupabaseVacancyDatabase)
+            
+        Raises:
+            ValueError: If db_type is invalid
         """
         # Auto-detect based on environment variables
         if db_type is None:
@@ -30,8 +33,12 @@ class VacancyDatabase:
         
         if db_type == 'supabase':
             return SupabaseVacancyDatabase()
-        else:
+        elif db_type == 'csv':
             return CSVVacancyDatabase()
+        else:
+            raise ValueError(
+                f"Unsupported db_type: {db_type!r}. Allowed values are 'csv', 'supabase', or None."
+            )
     
     @staticmethod
     def calculate_months_between(from_date: datetime, to_date: datetime) -> int:
@@ -223,11 +230,11 @@ class SupabaseVacancyDatabase(VacancyDatabase):
             return None
 
     def add_or_update(self, url: str, date_applied: str, title: str = "", company: str = ""):
-        """Додати або оновити запис про відгук"""
+        """Додати або оновити запис про відгук
+        
+        Uses atomic upsert to avoid race conditions with concurrent bot instances.
+        """
         try:
-            # Check if record exists
-            existing = self.get_application(url)
-            
             data = {
                 "url": url,
                 "date_applied": date_applied,
@@ -235,16 +242,9 @@ class SupabaseVacancyDatabase(VacancyDatabase):
                 "company": company,
             }
             
-            if existing:
-                # Update existing record
-                self.client.table(self.table_name).update(data).eq("url", url).execute()
-                self.logger.debug(
-                    f"♻️ Оновлено: {existing['date_applied']} → {date_applied}"
-                )
-            else:
-                # Insert new record
-                self.client.table(self.table_name).insert(data).execute()
-                self.logger.debug(f"➕ Новий запис: {date_applied} - {title}")
+            # Atomic upsert on URL field to prevent race conditions
+            self.client.table(self.table_name).upsert(data, on_conflict="url").execute()
+            self.logger.debug(f"💾 Upsert запису: {date_applied} - {title}")
                 
         except Exception as e:
             self.logger.error(f"❌ Помилка запису в Supabase: {e}")

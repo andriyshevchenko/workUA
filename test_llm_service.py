@@ -28,8 +28,6 @@ class TestLLMAnalysisService:
 
     def test_load_filter_success(self, tmp_path):
         """Test loading filter from file successfully"""
-        from unittest.mock import patch
-        
         service = LLMAnalysisService()
 
         # Create a temporary filter file
@@ -49,8 +47,6 @@ class TestLLMAnalysisService:
 
     def test_load_filter_file_not_found(self):
         """Test loading filter when file doesn't exist raises error"""
-        from unittest.mock import patch
-        
         service = LLMAnalysisService()
 
         # Mock config to use nonexistent file

@@ -18,7 +18,7 @@ class Config:
     WORKUA_PHONE: Optional[str] = os.getenv("WORKUA_PHONE")
 
     # Налаштування пошуку
-    RESUME_PATH: str = os.getenv("RESUME_PATH", "./my_resume.pdf")
+    FILTER_PATH: str = os.getenv("FILTER_PATH", "./my_filter.txt")
     SEARCH_KEYWORDS: list[str] = [
         kw.strip()
         for kw in os.getenv("SEARCH_KEYWORDS", "python developer").split(",")
@@ -49,7 +49,7 @@ class Config:
     # LLM перевірка перед відгуком
     USE_PRE_APPLY_LLM_CHECK: bool = os.getenv("USE_PRE_APPLY_LLM_CHECK", "false").lower() == "true"
     MIN_MATCH_PROBABILITY: int = int(
-        os.getenv("MIN_MATCH_PROBABILITY", "10")
+        os.getenv("MIN_MATCH_PROBABILITY", "90")
     )  # Мінімальна ймовірність (%) для відгуку
 
     # Playwright налаштування

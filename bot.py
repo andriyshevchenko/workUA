@@ -18,11 +18,11 @@ class WorkUABot:
         self.scraper = None
         self.llm_service = LLMAnalysisService()
 
-        # Load resume using shared resolution logic
-        from llm_service import resolve_resume_path
+        # Load filter using shared resolution logic
+        from llm_service import resolve_filter_path
 
-        resume_path = resolve_resume_path()
-        self.llm_service.load_resume(resume_path)
+        filter_path = resolve_filter_path()
+        self.llm_service.load_filter(filter_path)
 
     async def analyze_job(self, job: JobListing) -> Tuple[bool, int, str]:
         """Проаналізувати вакансію

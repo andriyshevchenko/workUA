@@ -156,10 +156,7 @@ class LLMAnalysisService:
         Returns:
             Formatted prompt string
         """
-        return f"""You are an HR assistant. Analyze if this job matches the user's filter criteria.
-
-USER FILTER CRITERIA:
-{self.filter_text}
+        return f"""You are an HR assistant. Analyze this job posting.
 
 JOB POSTING:
 Title: {job_title}
@@ -169,7 +166,7 @@ Salary: {salary or 'Not specified'}
 Description: {description[:1000] if description else 'No description'}
 
 TASK:
-1. Rate the match from 1 to 10 (10 = perfect match)
+1. Rate the overall quality and clarity from 1 to 10 (10 = excellent job posting)
 2. Explain why
 
 RESPONSE FORMAT (JSON):
@@ -192,10 +189,7 @@ RESPONSE FORMAT (JSON):
             return 50, "LLM analysis not available"
 
         try:
-            prompt = f"""Проаналізуй наскільки ця вакансія відповідає моїм критеріям пошуку.
-
-МОЇ КРИТЕРІЇ ПОШУКУ:
-{self.filter_text}
+            prompt = f"""Проаналізуй цю вакансію та оціни її якість та привабливість.
 
 ОПИС ВАКАНСІЇ:
 {job_description}
@@ -205,11 +199,11 @@ PROBABILITY: [число від 0 до 100]%
 EXPLANATION: [коротке пояснення чому така ймовірність]
 
 Врахуй:
-- Чи відповідає посада моїм критеріям
-- Чи відповідає зарплата мінімальним вимогам (якщо вказано)
-- Чи є компанія ФОП або без верифікації work.ua (якщо це важливо)
-- Чи не є компанія сумнівною (езотерика, сумнівні товари тощо, якщо це вказано в критеріях)
-- Інші критерії з моїх вимог
+- Чіткість опису позиції та обов'язків
+- Чи вказана зарплата та чи вона конкурентна
+- Репутація та надійність компанії (верифікація, тип компанії)
+- Загальна привабливість пропозиції
+- Якість та повнота опису вакансії
 """
 
             response = await self.client.chat.completions.create(

@@ -136,7 +136,8 @@ class TestLLMAnalysisService:
             "Python Developer", "Tech Corp", "Kyiv", "$50k", "Job description here"
         )
 
-        assert "Test Filter Criteria" in prompt
+        # Verify prompt is generic and doesn't leak filter data
+        assert "Test Filter Criteria" not in prompt
         assert "Python Developer" in prompt
         assert "Tech Corp" in prompt
         assert "Kyiv" in prompt

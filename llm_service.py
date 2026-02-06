@@ -11,21 +11,21 @@ from config import config
 
 def load_filter_content() -> str:
     """Load filter content from environment variable or file
-    
+
     Returns:
         Filter text content
-        
+
     Raises:
         ValueError: If neither FILTER_CONTENT nor FILTER_PATH is configured
         FileNotFoundError: If FILTER_PATH is configured but file doesn't exist
     """
     logger = logging.getLogger(__name__)
-    
+
     # Priority 1: Load from environment variable
     if config.FILTER_CONTENT:
         logger.info("✅ Loading filter from FILTER_CONTENT environment variable")
         return config.FILTER_CONTENT
-    
+
     # Priority 2: Load from file
     if config.FILTER_PATH:
         if not os.path.exists(config.FILTER_PATH):
@@ -36,7 +36,7 @@ def load_filter_content() -> str:
         logger.info(f"✅ Loading filter from file: {config.FILTER_PATH}")
         with open(config.FILTER_PATH, "r", encoding="utf-8") as f:
             return f.read()
-    
+
     # No filter configured
     raise ValueError(
         "Filter not configured. Please set FILTER_CONTENT environment variable "
@@ -72,10 +72,10 @@ class LLMAnalysisService:
 
     def load_filter(self) -> str:
         """Load user filter from environment or file
-        
+
         Returns:
             Filter text content
-            
+
         Raises:
             ValueError: If filter is not configured
             FileNotFoundError: If filter file doesn't exist

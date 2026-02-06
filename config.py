@@ -21,9 +21,7 @@ class Config:
     FILTER_PATH: Optional[str] = os.getenv("FILTER_PATH")
     FILTER_CONTENT: Optional[str] = os.getenv("FILTER_CONTENT")
     SEARCH_KEYWORDS: list[str] = [
-        kw.strip()
-        for kw in os.getenv("SEARCH_KEYWORDS", "").split(",")
-        if kw.strip()
+        kw.strip() for kw in os.getenv("SEARCH_KEYWORDS", "").split(",") if kw.strip()
     ]
     LOCATIONS: list[str] = [
         loc.strip() for loc in os.getenv("LOCATIONS", "").split(",") if loc.strip()
@@ -82,7 +80,7 @@ class Config:
 
         if not cls.SEARCH_KEYWORDS:
             errors.append("SEARCH_KEYWORDS is required")
-        
+
         # Ensure that either REMOTE_ONLY is enabled or at least one location is provided
         if not cls.REMOTE_ONLY and not cls.LOCATIONS:
             errors.append("LOCATIONS is required when REMOTE_ONLY is false")
@@ -91,9 +89,13 @@ class Config:
         llm_enabled = cls.USE_LLM or cls.USE_PRE_APPLY_LLM_CHECK
         if llm_enabled:
             if not cls.OPENAI_API_KEY:
-                errors.append("OPENAI_API_KEY is required when USE_LLM or USE_PRE_APPLY_LLM_CHECK is enabled")
+                errors.append(
+                    "OPENAI_API_KEY is required when USE_LLM or USE_PRE_APPLY_LLM_CHECK is enabled"
+                )
             if not cls.FILTER_PATH and not cls.FILTER_CONTENT:
-                errors.append("FILTER_PATH or FILTER_CONTENT is required when USE_LLM or USE_PRE_APPLY_LLM_CHECK is enabled")
+                errors.append(
+                    "FILTER_PATH or FILTER_CONTENT is required when USE_LLM or USE_PRE_APPLY_LLM_CHECK is enabled"
+                )
 
         if errors:
             raise ValueError("Configuration errors:\n  - " + "\n  - ".join(errors))

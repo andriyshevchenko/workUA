@@ -10,36 +10,36 @@ from config import config
 
 class VacancyDatabase:
     """Base class for vacancy database - factory pattern"""
-    
+
     @staticmethod
     def create(db_type: Optional[str] = None):
         """Factory method to create appropriate database instance
-        
+
         Args:
             db_type: Type of database ('csv', 'supabase', or None for auto-detect)
-            
+
         Returns:
             Database instance (CSVVacancyDatabase or SupabaseVacancyDatabase)
-            
+
         Raises:
             ValueError: If db_type is invalid
         """
         # Auto-detect based on environment variables
         if db_type is None:
             if config.SUPABASE_URL and config.SUPABASE_KEY:
-                db_type = 'supabase'
+                db_type = "supabase"
             else:
-                db_type = 'csv'
-        
-        if db_type == 'supabase':
+                db_type = "csv"
+
+        if db_type == "supabase":
             return SupabaseVacancyDatabase()
-        elif db_type == 'csv':
+        elif db_type == "csv":
             return CSVVacancyDatabase()
         else:
             raise ValueError(
                 f"Unsupported db_type: {db_type!r}. Allowed values are 'csv', 'supabase', or None."
             )
-    
+
     @staticmethod
     def calculate_months_between(from_date: datetime, to_date: datetime) -> int:
         """Calculate the number of months between two dates
@@ -180,16 +180,17 @@ class SupabaseVacancyDatabase(VacancyDatabase):
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        
+
         # Validate configuration
         if not config.SUPABASE_URL or not config.SUPABASE_KEY:
             raise ValueError(
                 "Supabase configuration missing. Please set SUPABASE_URL and SUPABASE_KEY "
                 "environment variables."
             )
-        
+
         try:
             from supabase import create_client, Client
+
             self.client: Client = create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
             self.table_name = "applied_jobs"
             self.logger.info("✅ Supabase database initialized")
@@ -203,13 +204,8 @@ class SupabaseVacancyDatabase(VacancyDatabase):
     def get_application(self, url: str) -> Optional[Dict[str, str]]:
         """Отримати запис про відгук за URL"""
         try:
-            response = (
-                self.client.table(self.table_name)
-                .select("*")
-                .eq("url", url)
-                .execute()
-            )
-            
+            response = self.client.table(self.table_name).select("*").eq("url", url).execute()
+
             if response.data and len(response.data) > 0:
                 record = response.data[0]
                 self.logger.debug(
@@ -221,17 +217,17 @@ class SupabaseVacancyDatabase(VacancyDatabase):
                     "title": record.get("title", ""),
                     "company": record.get("company", ""),
                 }
-            
+
             self.logger.debug("🔍 Не знайдено в БД")
             return None
-            
+
         except Exception as e:
             self.logger.error(f"❌ Помилка читання з Supabase: {e}")
             return None
 
     def add_or_update(self, url: str, date_applied: str, title: str = "", company: str = ""):
         """Додати або оновити запис про відгук
-        
+
         Uses atomic upsert to avoid race conditions with concurrent bot instances.
         """
         try:
@@ -241,11 +237,11 @@ class SupabaseVacancyDatabase(VacancyDatabase):
                 "title": title,
                 "company": company,
             }
-            
+
             # Atomic upsert on URL field to prevent race conditions
             self.client.table(self.table_name).upsert(data, on_conflict="url").execute()
             self.logger.debug(f"💾 Upsert запису: {date_applied} - {title}")
-                
+
         except Exception as e:
             self.logger.error(f"❌ Помилка запису в Supabase: {e}")
 
@@ -268,7 +264,7 @@ class SupabaseVacancyDatabase(VacancyDatabase):
             # Handle both string and date objects for compatibility
             if not isinstance(date_str, str):
                 date_str = str(date_str)
-            
+
             date_applied = datetime.strptime(date_str, "%Y-%m-%d")
             now = datetime.now()
             months_passed = self.calculate_months_between(date_applied, now)
@@ -296,7 +292,7 @@ class SupabaseVacancyDatabase(VacancyDatabase):
             # Handle both string and date objects for compatibility
             if not isinstance(date_str, str):
                 date_str = str(date_str)
-                
+
             date_applied = datetime.strptime(date_str, "%Y-%m-%d")
             now = datetime.now()
             months_passed = self.calculate_months_between(date_applied, now)

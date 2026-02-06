@@ -272,7 +272,7 @@ async def main():
     """Головна функція"""
     # Validate configuration at startup to fail fast
     config.validate()
-    
+
     setup_logging()
 
     # Кількість відгуків (можна з config)

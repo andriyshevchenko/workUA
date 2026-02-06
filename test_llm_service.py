@@ -39,7 +39,7 @@ class TestLLMAnalysisService:
         with patch("llm_service.config") as mock_config:
             mock_config.FILTER_CONTENT = None
             mock_config.FILTER_PATH = str(filter_file)
-            
+
             result = service.load_filter()
 
             assert result == filter_content
@@ -53,7 +53,7 @@ class TestLLMAnalysisService:
         with patch("llm_service.config") as mock_config:
             mock_config.FILTER_CONTENT = None
             mock_config.FILTER_PATH = "nonexistent_file.txt"
-            
+
             # Should raise FileNotFoundError instead of returning fallback
             with pytest.raises(FileNotFoundError):
                 service.load_filter()

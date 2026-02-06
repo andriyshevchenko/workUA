@@ -143,13 +143,13 @@ class WorkUAScraper:
 
     async def load_cookies(self, filepath: str = "cookies.json") -> bool:
         """Load cookies from environment variable or file
-        
+
         Args:
             filepath: Path to cookies file (used if WORKUA_COOKIES env var is not set)
-            
+
         Returns:
             True if cookies loaded successfully, False otherwise
-            
+
         Raises:
             ValueError: If WORKUA_COOKIES is set but invalid (fatal in CI/CD)
         """
@@ -167,7 +167,7 @@ class WorkUAScraper:
                     f"WORKUA_COOKIES is set but invalid: {e}. "
                     "Fix the cookies JSON or remove the variable."
                 ) from e
-        
+
         # Priority 2: Load from file
         if os.path.exists(filepath):
             try:
@@ -180,7 +180,7 @@ class WorkUAScraper:
             except Exception as e:
                 self.logger.warning(f"⚠️ Failed to load cookies from file: {e}")
                 return False
-        
+
         self.logger.info("ℹ️ No cookies found (neither in env var nor file)")
         return False
 

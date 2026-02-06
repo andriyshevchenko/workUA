@@ -98,12 +98,15 @@ class TestConfig:
 
     def test_validate_with_api_key(self):
         """Test validation with API key present"""
-        with patch.dict(os.environ, {
-            "OPENAI_API_KEY": "test-key",
-            "WORKUA_PHONE": "+380123456789",
-            "SEARCH_KEYWORDS": "python developer",
-            "LOCATIONS": "Київ"
-        }):
+        with patch.dict(
+            os.environ,
+            {
+                "OPENAI_API_KEY": "test-key",
+                "WORKUA_PHONE": "+380123456789",
+                "SEARCH_KEYWORDS": "python developer",
+                "LOCATIONS": "Київ",
+            },
+        ):
             from importlib import reload
             import config as config_module
 
@@ -115,11 +118,15 @@ class TestConfig:
 
     def test_validate_without_api_key(self):
         """Test validation without API key when not needed"""
-        with patch.dict(os.environ, {
-            "WORKUA_PHONE": "+380123456789",
-            "SEARCH_KEYWORDS": "python developer",
-            "LOCATIONS": "Київ"
-        }, clear=True):
+        with patch.dict(
+            os.environ,
+            {
+                "WORKUA_PHONE": "+380123456789",
+                "SEARCH_KEYWORDS": "python developer",
+                "LOCATIONS": "Київ",
+            },
+            clear=True,
+        ):
             from importlib import reload
             import config as config_module
 

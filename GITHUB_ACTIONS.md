@@ -136,8 +136,9 @@ The bot now uses strict validation:
 If required fields are missing, you'll get a clear error:
 ```
 Configuration errors:
-  - WORKUA_PHONE or WORKUA_COOKIES is required
+  - WORKUA_PHONE, WORKUA_COOKIES, or cookies.json is required
   - SEARCH_KEYWORDS is required
+  - LOCATIONS is required when REMOTE_ONLY is false
 ```
 
 ### LLM Features Enabled

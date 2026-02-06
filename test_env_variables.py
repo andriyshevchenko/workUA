@@ -83,30 +83,21 @@ class TestCookiesLoading:
 class TestConfigValidation:
     """Test configuration validation"""
 
-    def test_validate_missing_phone_and_cookies(self):
+    def test_validate_missing_phone_and_cookies(self, tmp_path, monkeypatch):
         """Test validation fails when neither WORKUA_PHONE nor WORKUA_COOKIES is set"""
-        # Temporarily remove cookies.json if it exists
-        import shutil
-        cookies_backup = None
-        if os.path.exists("cookies.json"):
-            cookies_backup = "cookies.json.backup"
-            shutil.move("cookies.json", cookies_backup)
+        # Run in an isolated temporary directory with no cookies.json present
+        monkeypatch.chdir(tmp_path)
         
-        try:
-            with patch.dict(os.environ, {
-                "SEARCH_KEYWORDS": "python developer",
-                "LOCATIONS": "Київ"
-            }, clear=True):
-                from importlib import reload
-                import config as config_module
-                reload(config_module)
-                
-                with pytest.raises(ValueError, match="WORKUA_PHONE, WORKUA_COOKIES, or cookies.json"):
-                    config_module.config.validate()
-        finally:
-            # Restore cookies.json if it was backed up
-            if cookies_backup and os.path.exists(cookies_backup):
-                shutil.move(cookies_backup, "cookies.json")
+        with patch.dict(os.environ, {
+            "SEARCH_KEYWORDS": "python developer",
+            "LOCATIONS": "Київ"
+        }, clear=True):
+            from importlib import reload
+            import config as config_module
+            reload(config_module)
+            
+            with pytest.raises(ValueError, match="WORKUA_PHONE, WORKUA_COOKIES, or cookies.json"):
+                config_module.config.validate()
 
     def test_validate_missing_search_keywords(self):
         """Test validation fails when SEARCH_KEYWORDS is empty"""

@@ -105,15 +105,17 @@ CREATE POLICY "Allow all for authenticated" ON applied_jobs
     FOR ALL USING (auth.role() = 'authenticated');
 ```
 
-**Option B: For anonymous/service role (GitHub Actions)**
-```sql
--- Enable RLS
-ALTER TABLE applied_jobs ENABLE ROW LEVEL SECURITY;
-
--- Allow all (use service_role key in env vars)
-CREATE POLICY "Allow all operations" ON applied_jobs
-    FOR ALL USING (true);
-```
+> **Important:** When using the **service_role** key (e.g., in GitHub Actions),
+> Supabase bypasses RLS checks entirely. You **do not** need an additional
+> `USING (true)` policy for service_role access.
+>
+> Never create a policy such as:
+> ```sql
+> CREATE POLICY "Allow all operations" ON applied_jobs
+>     FOR ALL USING (true);
+> ```
+> This pattern is unsafe, and if an `anon` key is ever used, it can effectively
+> expose the entire table to the public.
 
 ### Step 5: Set Environment Variables
 
@@ -128,17 +130,6 @@ SUPABASE_KEY=your-service-role-key
 2. Add secrets:
    - `SUPABASE_URL`: Your project URL
    - `SUPABASE_KEY`: Your **service role key** (not anon key)
-
-**In workflow file:**
-```yaml
-env:
-  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-  SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-```
-1. Go to repository **Settings** > **Secrets and variables** > **Actions**
-2. Add secrets:
-   - `SUPABASE_URL`: Your project URL
-   - `SUPABASE_KEY`: Your service role key
 
 **In workflow file:**
 ```yaml

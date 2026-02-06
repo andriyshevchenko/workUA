@@ -73,7 +73,6 @@ class Config:
     @classmethod
     def validate(cls) -> bool:
         """Перевірити чи є необхідні налаштування"""
-        import os
         errors = []
 
         # Check authentication: env vars or cookies.json file

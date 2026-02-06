@@ -85,21 +85,35 @@ class TestConfigValidation:
 
     def test_validate_missing_phone_and_cookies(self):
         """Test validation fails when neither WORKUA_PHONE nor WORKUA_COOKIES is set"""
-        with patch.dict(os.environ, {
-            "SEARCH_KEYWORDS": "python developer"
-        }, clear=True):
-            from importlib import reload
-            import config as config_module
-            reload(config_module)
-            
-            with pytest.raises(ValueError, match="WORKUA_PHONE or WORKUA_COOKIES"):
-                config_module.config.validate()
+        # Temporarily remove cookies.json if it exists
+        import shutil
+        cookies_backup = None
+        if os.path.exists("cookies.json"):
+            cookies_backup = "cookies.json.backup"
+            shutil.move("cookies.json", cookies_backup)
+        
+        try:
+            with patch.dict(os.environ, {
+                "SEARCH_KEYWORDS": "python developer",
+                "LOCATIONS": "Київ"
+            }, clear=True):
+                from importlib import reload
+                import config as config_module
+                reload(config_module)
+                
+                with pytest.raises(ValueError, match="WORKUA_PHONE, WORKUA_COOKIES, or cookies.json"):
+                    config_module.config.validate()
+        finally:
+            # Restore cookies.json if it was backed up
+            if cookies_backup and os.path.exists(cookies_backup):
+                shutil.move(cookies_backup, "cookies.json")
 
     def test_validate_missing_search_keywords(self):
         """Test validation fails when SEARCH_KEYWORDS is empty"""
         with patch.dict(os.environ, {
             "WORKUA_PHONE": "+380123456789",
-            "SEARCH_KEYWORDS": ""
+            "SEARCH_KEYWORDS": "",
+            "LOCATIONS": "Київ"
         }, clear=True):
             from importlib import reload
             import config as config_module
@@ -113,6 +127,7 @@ class TestConfigValidation:
         with patch.dict(os.environ, {
             "WORKUA_PHONE": "+380123456789",
             "SEARCH_KEYWORDS": "python",
+            "LOCATIONS": "Київ",
             "USE_LLM": "true"
         }, clear=True):
             from importlib import reload
@@ -127,6 +142,7 @@ class TestConfigValidation:
         with patch.dict(os.environ, {
             "WORKUA_PHONE": "+380123456789",
             "SEARCH_KEYWORDS": "python",
+            "LOCATIONS": "Київ",
             "USE_LLM": "true",
             "OPENAI_API_KEY": "test-key"
         }, clear=True):
@@ -141,7 +157,8 @@ class TestConfigValidation:
         """Test validation succeeds with required fields"""
         with patch.dict(os.environ, {
             "WORKUA_PHONE": "+380123456789",
-            "SEARCH_KEYWORDS": "python developer"
+            "SEARCH_KEYWORDS": "python developer",
+            "LOCATIONS": "Київ"
         }, clear=True):
             from importlib import reload
             import config as config_module
@@ -154,7 +171,8 @@ class TestConfigValidation:
         """Test validation succeeds with cookies instead of phone"""
         with patch.dict(os.environ, {
             "WORKUA_COOKIES": '[{"name":"test"}]',
-            "SEARCH_KEYWORDS": "python developer"
+            "SEARCH_KEYWORDS": "python developer",
+            "LOCATIONS": "Київ"
         }, clear=True):
             from importlib import reload
             import config as config_module
@@ -168,6 +186,7 @@ class TestConfigValidation:
         with patch.dict(os.environ, {
             "WORKUA_PHONE": "+380123456789",
             "SEARCH_KEYWORDS": "python",
+            "LOCATIONS": "Київ",
             "USE_LLM": "true",
             "OPENAI_API_KEY": "test-key",
             "FILTER_CONTENT": "Test filter"

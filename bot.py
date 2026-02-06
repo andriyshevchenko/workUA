@@ -9,9 +9,6 @@ from config import config
 from logging_config import setup_logging
 from llm_service import LLMAnalysisService
 
-# Validate configuration at startup to fail fast
-config.validate()
-
 
 class WorkUABot:
     """Бот для автоматичного відгуку на вакансії"""
@@ -273,6 +270,9 @@ class WorkUABot:
 
 async def main():
     """Головна функція"""
+    # Validate configuration at startup to fail fast
+    config.validate()
+    
     setup_logging()
 
     # Кількість відгуків (можна з config)

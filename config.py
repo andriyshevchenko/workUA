@@ -73,14 +73,20 @@ class Config:
     @classmethod
     def validate(cls) -> bool:
         """Перевірити чи є необхідні налаштування"""
+        import os
         errors = []
 
-        # Check required fields
-        if not cls.WORKUA_PHONE and not cls.WORKUA_COOKIES:
-            errors.append("WORKUA_PHONE or WORKUA_COOKIES is required")
+        # Check authentication: env vars or cookies.json file
+        cookies_file_exists = os.path.exists("cookies.json")
+        if not cls.WORKUA_PHONE and not cls.WORKUA_COOKIES and not cookies_file_exists:
+            errors.append("WORKUA_PHONE, WORKUA_COOKIES, or cookies.json is required")
 
         if not cls.SEARCH_KEYWORDS:
             errors.append("SEARCH_KEYWORDS is required")
+        
+        # Ensure that either REMOTE_ONLY is enabled or at least one location is provided
+        if not cls.REMOTE_ONLY and not cls.LOCATIONS:
+            errors.append("LOCATIONS is required when REMOTE_ONLY is false")
 
         # Check LLM-specific requirements
         llm_enabled = cls.USE_LLM or cls.USE_PRE_APPLY_LLM_CHECK

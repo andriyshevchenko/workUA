@@ -193,12 +193,12 @@ class SupabaseVacancyDatabase(VacancyDatabase):
             self.client: Client = create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
             self.table_name = "applied_jobs"
             self.logger.info("✅ Supabase database initialized")
-        except ImportError:
+        except ImportError as e:
             raise ImportError(
                 "Supabase library not installed. Install with: pip install supabase"
-            )
+            ) from e
         except Exception as e:
-            raise RuntimeError(f"Failed to initialize Supabase client: {e}")
+            raise RuntimeError(f"Failed to initialize Supabase client: {e}") from e
 
     def get_application(self, url: str) -> Optional[Dict[str, str]]:
         """Отримати запис про відгук за URL"""

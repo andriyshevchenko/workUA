@@ -69,15 +69,31 @@ Alternatively, use the Table Editor:
 1. In Supabase dashboard, go to **Settings** > **API**
 2. Copy these values:
    - **Project URL**: `https://xxxxx.supabase.co`
-   - **anon public key**: `eyJxxx...` (for basic use)
-   - **service_role key**: `eyJxxx...` (for GitHub Actions)
+   - **service_role key**: `eyJxxx...` (required - bypasses RLS)
 
-⚠️ **Security Note**: 
-- Use **anon key** for local development with RLS enabled
-- Use **service_role key** for GitHub Actions (bypasses RLS)
-- Never commit keys to repository - use secrets!
+⚠️ **Important Note**: 
+- The bot does **NOT** use Supabase Auth for user authentication
+- You **MUST** use the **service_role key** (not anon key) because:
+  - The bot needs direct database access without Supabase Auth login
+  - Service role key bypasses Row Level Security (RLS)
+  - Anon key with RLS policies will fail unless you configure public access (not recommended)
+- The service_role key should be treated as a secret and only used server-side (GitHub Actions)
 
 ### Step 4: Configure Row Level Security (RLS)
+
+Since the bot uses a service_role key (which bypasses RLS), you can keep RLS policies restrictive for other access methods:
+
+**Recommended: Keep restrictive policies**
+```sql
+-- Enable RLS
+ALTER TABLE applied_jobs ENABLE ROW LEVEL SECURITY;
+
+-- Only allow authenticated users (won't affect service_role key)
+CREATE POLICY "Allow authenticated users" ON applied_jobs
+    FOR ALL USING (auth.role() = 'authenticated');
+```
+
+The service_role key bypasses all RLS policies, so these policies only affect other clients using anon/authenticated keys.
 
 **Option A: For authenticated use (recommended)**
 ```sql
@@ -104,10 +120,21 @@ CREATE POLICY "Allow all operations" ON applied_jobs
 **Local Development (.env file)**
 ```bash
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your-anon-or-service-key
+SUPABASE_KEY=your-service-role-key
 ```
 
 **GitHub Actions (Repository Secrets)**
+1. Go to repository **Settings** > **Secrets and variables** > **Actions**
+2. Add secrets:
+   - `SUPABASE_URL`: Your project URL
+   - `SUPABASE_KEY`: Your **service role key** (not anon key)
+
+**In workflow file:**
+```yaml
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+```
 1. Go to repository **Settings** > **Secrets and variables** > **Actions**
 2. Add secrets:
    - `SUPABASE_URL`: Your project URL

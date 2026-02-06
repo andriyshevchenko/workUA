@@ -12,7 +12,6 @@ class Config:
 
     # API Keys
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
-    ANTHROPIC_API_KEY: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
 
     # Work.ua credentials
     WORKUA_PHONE: Optional[str] = os.getenv("WORKUA_PHONE")

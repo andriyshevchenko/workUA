@@ -272,8 +272,13 @@ class SupabaseVacancyDatabase(VacancyDatabase):
             return True
 
         try:
-            # Парсимо дату
-            date_applied = datetime.strptime(record["date_applied"], "%Y-%m-%d")
+            # Суп abase returns date_applied as string in YYYY-MM-DD format
+            date_str = record["date_applied"]
+            # Handle both string and date objects for compatibility
+            if not isinstance(date_str, str):
+                date_str = str(date_str)
+            
+            date_applied = datetime.strptime(date_str, "%Y-%m-%d")
             now = datetime.now()
             months_passed = self.calculate_months_between(date_applied, now)
 
@@ -295,7 +300,13 @@ class SupabaseVacancyDatabase(VacancyDatabase):
             return None
 
         try:
-            date_applied = datetime.strptime(record["date_applied"], "%Y-%m-%d")
+            # Supabase returns date_applied as string in YYYY-MM-DD format
+            date_str = record["date_applied"]
+            # Handle both string and date objects for compatibility
+            if not isinstance(date_str, str):
+                date_str = str(date_str)
+                
+            date_applied = datetime.strptime(date_str, "%Y-%m-%d")
             now = datetime.now()
             months_passed = self.calculate_months_between(date_applied, now)
             return months_passed

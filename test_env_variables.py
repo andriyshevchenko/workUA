@@ -3,7 +3,6 @@
 import pytest
 import os
 from unittest.mock import patch, mock_open
-from config import Config
 
 
 class TestFilterLoading:

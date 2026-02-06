@@ -237,22 +237,13 @@ class SupabaseVacancyDatabase(VacancyDatabase):
             
             if existing:
                 # Update existing record
-                response = (
-                    self.client.table(self.table_name)
-                    .update(data)
-                    .eq("url", url)
-                    .execute()
-                )
+                self.client.table(self.table_name).update(data).eq("url", url).execute()
                 self.logger.debug(
                     f"♻️ Оновлено: {existing['date_applied']} → {date_applied}"
                 )
             else:
                 # Insert new record
-                response = (
-                    self.client.table(self.table_name)
-                    .insert(data)
-                    .execute()
-                )
+                self.client.table(self.table_name).insert(data).execute()
                 self.logger.debug(f"➕ Новий запис: {date_applied} - {title}")
                 
         except Exception as e:
@@ -272,7 +263,7 @@ class SupabaseVacancyDatabase(VacancyDatabase):
             return True
 
         try:
-            # Суп abase returns date_applied as string in YYYY-MM-DD format
+            # Supabase returns date_applied as string in YYYY-MM-DD format
             date_str = record["date_applied"]
             # Handle both string and date objects for compatibility
             if not isinstance(date_str, str):

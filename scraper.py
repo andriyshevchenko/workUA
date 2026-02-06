@@ -54,7 +54,7 @@ class WorkUAScraper:
         # Ініціалізація логера
         self.logger = logging.getLogger(__name__)
 
-        # Load filter for LLM analysis
+        # Load filter for LLM analysis (if any LLM feature is enabled)
         if self.llm_service.use_llm:
             from llm_service import resolve_filter_path
 

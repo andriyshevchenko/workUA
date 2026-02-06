@@ -18,11 +18,12 @@ class WorkUABot:
         self.scraper = None
         self.llm_service = LLMAnalysisService()
 
-        # Load filter using shared resolution logic
-        from llm_service import resolve_filter_path
+        # Load filter only if LLM features are enabled
+        if self.llm_service.use_llm:
+            from llm_service import resolve_filter_path
 
-        filter_path = resolve_filter_path()
-        self.llm_service.load_filter(filter_path)
+            filter_path = resolve_filter_path()
+            self.llm_service.load_filter(filter_path)
 
     async def analyze_job(self, job: JobListing) -> Tuple[bool, int, str]:
         """Проаналізувати вакансію

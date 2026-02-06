@@ -210,17 +210,6 @@ uv run python test_apply.py
 
 ## 🔧 Налаштування бота
 
-### Резюме
-Відредагуйте метод `_load_resume()` в [bot.py](c:\Users\Ernest\Desktop\workUA\bot.py) або додайте файл резюме:
-
-```python
-def _load_resume(self) -> str:
-    resume_path = Path(config.RESUME_PATH)
-    if resume_path.exists():
-        return resume_path.read_text(encoding='utf-8')
-    return "Ваше резюме тут..."
-```
-
 ### Ключові слова
 ```env
 SEARCH_KEYWORDS=python developer,backend developer,django developer

@@ -44,7 +44,11 @@ class LLMAnalysisService:
         self.use_llm = False
         self.filter_text = ""
 
-        if config.OPENAI_API_KEY and hasattr(config, "USE_LLM") and config.USE_LLM:
+        # Initialize client if any LLM feature is enabled
+        llm_enabled = (hasattr(config, "USE_LLM") and config.USE_LLM) or \
+                      (hasattr(config, "USE_PRE_APPLY_LLM_CHECK") and config.USE_PRE_APPLY_LLM_CHECK)
+        
+        if config.OPENAI_API_KEY and llm_enabled:
             try:
                 self.client = AsyncOpenAI(api_key=config.OPENAI_API_KEY)
                 self.use_llm = True

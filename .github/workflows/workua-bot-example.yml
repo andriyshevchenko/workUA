@@ -1,0 +1,72 @@
+# Example GitHub Actions workflow for running WorkUA bot
+# This demonstrates how to use environment variables for filter and cookies
+
+name: WorkUA Bot
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Run every Monday at 9 AM UTC
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  apply-to-jobs:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          playwright install chromium
+      
+      - name: Run WorkUA bot
+        env:
+          # Required: OpenAI API Key for LLM features
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          
+          # Required: Authentication (use either WORKUA_COOKIES or WORKUA_PHONE)
+          WORKUA_COOKIES: ${{ secrets.WORKUA_COOKIES }}
+          # WORKUA_PHONE: ${{ secrets.WORKUA_PHONE }}
+          
+          # Required: Search configuration
+          SEARCH_KEYWORDS: python developer,backend developer
+          LOCATIONS: Київ,Львів
+          
+          # Required: Filter content (alternative to FILTER_PATH)
+          FILTER_CONTENT: |
+            Я шукаю вакансії Python/Backend розробника.
+            Мінімальна зарплата: 50000 гривень.
+            Досвід роботи: від 3 років.
+            Вакансії від ФОП чи без верифікації work.ua - не влаштовують.
+          
+          # Optional: Bot configuration
+          MAX_APPLICATIONS: 10
+          USE_LLM: true
+          USE_PRE_APPLY_LLM_CHECK: true
+          MIN_MATCH_PROBABILITY: 85
+          HEADLESS: true
+          REMOTE_ONLY: false
+          
+        run: |
+          python3 bot.py
+
+# How to set up secrets:
+# 1. Go to your repository Settings > Secrets and variables > Actions
+# 2. Add the following secrets:
+#    - OPENAI_API_KEY: Your OpenAI API key
+#    - WORKUA_COOKIES: JSON string of cookies (get from browser after login)
+#      Example: '[{"name":"sessionid","value":"xxx","domain":".work.ua","path":"/"}]'
+#    - Alternatively, use WORKUA_PHONE for phone-based login
+#
+# To get cookies:
+# 1. Log in to work.ua in your browser
+# 2. Open DevTools (F12) > Application > Cookies
+# 3. Copy all work.ua cookies as JSON array
+# 4. Set as WORKUA_COOKIES secret

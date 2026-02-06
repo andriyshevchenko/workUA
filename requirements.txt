@@ -3,3 +3,4 @@ openai==1.54.0
 python-dotenv==1.0.1
 pydantic==2.8.2
 beautifulsoup4==4.12.3
+supabase==2.11.0

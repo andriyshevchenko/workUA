@@ -48,7 +48,7 @@ class WorkUAScraper:
         self.context = None
         self.is_logged_in = False
         self.applied_jobs = set()  # Множина URL вакансій на які вже відгукнулись
-        self.db = VacancyDatabase()  # База даних відгуків
+        self.db = VacancyDatabase.create()  # База даних відгуків (auto-detect CSV or Supabase)
         self.llm_service = LLMAnalysisService()  # LLM analysis service
 
         # Ініціалізація логера

@@ -57,6 +57,10 @@ class Config:
     HEADLESS: bool = os.getenv("HEADLESS", "false").lower() == "true"
     BROWSER_TYPE: str = os.getenv("BROWSER_TYPE", "chromium")
 
+    # Supabase налаштування
+    SUPABASE_URL: Optional[str] = os.getenv("SUPABASE_URL")
+    SUPABASE_KEY: Optional[str] = os.getenv("SUPABASE_KEY")
+
     # URL
     WORKUA_BASE_URL: str = "https://www.work.ua"
     WORKUA_LOGIN_URL: str = "https://www.work.ua/ua/login/"

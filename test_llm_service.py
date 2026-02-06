@@ -25,29 +25,29 @@ class TestLLMAnalysisService:
                     assert service.use_llm is True
                     mock_openai.assert_called_once_with(api_key="test-key")
 
-    def test_load_resume_success(self, tmp_path):
-        """Test loading resume from file successfully"""
+    def test_load_filter_success(self, tmp_path):
+        """Test loading filter from file successfully"""
         service = LLMAnalysisService()
 
-        # Create a temporary resume file
-        resume_file = tmp_path / "test_resume.txt"
-        resume_content = "Test Resume Content\nPython Developer"
-        resume_file.write_text(resume_content, encoding="utf-8")
+        # Create a temporary filter file
+        filter_file = tmp_path / "test_filter.txt"
+        filter_content = "Я шукаю вакансії 'Python Developer'. Мінімальна зарплата: 30000 грн."
+        filter_file.write_text(filter_content, encoding="utf-8")
 
-        result = service.load_resume(str(resume_file))
+        result = service.load_filter(str(filter_file))
 
-        assert result == resume_content
-        assert service.resume_text == resume_content
+        assert result == filter_content
+        assert service.filter_text == filter_content
 
-    def test_load_resume_file_not_found(self):
-        """Test loading resume when file doesn't exist"""
+    def test_load_filter_file_not_found(self):
+        """Test loading filter when file doesn't exist"""
         service = LLMAnalysisService()
 
-        result = service.load_resume("nonexistent_file.txt")
+        result = service.load_filter("nonexistent_file.txt")
 
-        # Should return fallback resume
-        assert "Sales Manager" in result or "B2B" in result
-        assert service.resume_text != ""
+        # Should return fallback filter
+        assert "менеджер з продажу" in result or "sales manager" in result
+        assert service.filter_text != ""
 
     async def test_analyze_job_brute_force_mode(self):
         """Test job analysis in brute force mode (no LLM)"""
@@ -66,7 +66,7 @@ class TestLLMAnalysisService:
         """Test job analysis with LLM when successful"""
         service = LLMAnalysisService()
         service.use_llm = True
-        service.resume_text = "Python Developer with 5 years experience"
+        service.filter_text = "Я шукаю вакансії Python Developer з зарплатою від 30000 грн"
 
         # Mock the AsyncOpenAI client
         mock_client = Mock()
@@ -88,7 +88,7 @@ class TestLLMAnalysisService:
         """Test job analysis with LLM when score is too low"""
         service = LLMAnalysisService()
         service.use_llm = True
-        service.resume_text = "Python Developer"
+        service.filter_text = "Я шукаю вакансії Python Developer"
 
         # Mock the AsyncOpenAI client
         mock_client = Mock()
@@ -130,13 +130,14 @@ class TestLLMAnalysisService:
     def test_build_analysis_prompt(self):
         """Test building the analysis prompt"""
         service = LLMAnalysisService()
-        service.resume_text = "Test Resume"
+        service.filter_text = "Test Filter Criteria"
 
         prompt = service._build_analysis_prompt(
             "Python Developer", "Tech Corp", "Kyiv", "$50k", "Job description here"
         )
 
-        assert "Test Resume" in prompt
+        # Verify prompt is generic and doesn't leak filter data
+        assert "Test Filter Criteria" not in prompt
         assert "Python Developer" in prompt
         assert "Tech Corp" in prompt
         assert "Kyiv" in prompt
@@ -156,7 +157,7 @@ class TestLLMAnalysisService:
         """Test analyze_job_match with successful LLM response"""
         service = LLMAnalysisService()
         service.use_llm = True
-        service.resume_text = "Test Resume"
+        service.filter_text = "Test Filter"
 
         # Mock the AsyncOpenAI client
         mock_client = Mock()

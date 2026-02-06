@@ -54,12 +54,12 @@ class WorkUAScraper:
         # Ініціалізація логера
         self.logger = logging.getLogger(__name__)
 
-        # Load resume for LLM analysis
+        # Load filter for LLM analysis (if any LLM feature is enabled)
         if self.llm_service.use_llm:
-            from llm_service import resolve_resume_path
+            from llm_service import resolve_filter_path
 
-            resume_path = resolve_resume_path()
-            self.llm_service.load_resume(resume_path)
+            filter_path = resolve_filter_path()
+            self.llm_service.load_filter(filter_path)
 
     async def start(self, headless: bool = False):
         """Запустити браузер з stealth режимом та реалістичними налаштуваннями"""

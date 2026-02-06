@@ -9,29 +9,29 @@ from openai import AsyncOpenAI
 from config import config
 
 
-def resolve_resume_path() -> str:
-    """Resolve resume path with fallback to bundled resume
+def resolve_filter_path() -> str:
+    """Resolve filter path with fallback to bundled filter
 
     Returns:
-        Path to resume file (configured or fallback)
+        Path to filter file (configured or fallback)
     """
-    resume_path = getattr(config, "RESUME_PATH", "./my_resume.pdf")
-    if not os.path.exists(resume_path):
-        fallback_path = "resume_Osipov_Ernest.txt"
+    filter_path = getattr(config, "FILTER_PATH", "./my_filter.txt")
+    if not os.path.exists(filter_path):
+        fallback_path = "filter_example.txt"
         if os.path.exists(fallback_path):
             logging.getLogger(__name__).warning(
-                "Configured resume path '%s' not found, using bundled '%s'",
-                resume_path,
+                "Configured filter path '%s' not found, using bundled '%s'",
+                filter_path,
                 fallback_path,
             )
             return fallback_path
         else:
             logging.getLogger(__name__).warning(
-                "Neither configured resume path '%s' nor fallback '%s' exist",
-                resume_path,
+                "Neither configured filter path '%s' nor fallback '%s' exist",
+                filter_path,
                 fallback_path,
             )
-    return resume_path
+    return filter_path
 
 
 class LLMAnalysisService:
@@ -42,9 +42,14 @@ class LLMAnalysisService:
         self.logger = logging.getLogger(__name__)
         self.client: Optional[AsyncOpenAI] = None
         self.use_llm = False
-        self.resume_text = ""
+        self.filter_text = ""
 
-        if config.OPENAI_API_KEY and hasattr(config, "USE_LLM") and config.USE_LLM:
+        # Initialize client if any LLM feature is enabled
+        llm_enabled = (hasattr(config, "USE_LLM") and config.USE_LLM) or (
+            hasattr(config, "USE_PRE_APPLY_LLM_CHECK") and config.USE_PRE_APPLY_LLM_CHECK
+        )
+
+        if config.OPENAI_API_KEY and llm_enabled:
             try:
                 self.client = AsyncOpenAI(api_key=config.OPENAI_API_KEY)
                 self.use_llm = True
@@ -55,37 +60,31 @@ class LLMAnalysisService:
         else:
             self.logger.info("ℹ️ LLM analysis disabled - brute force mode")
 
-    def load_resume(self, resume_path: str) -> str:
-        """Load user resume from file
+    def load_filter(self, filter_path: str) -> str:
+        """Load user filter from file
 
         Args:
-            resume_path: Path to resume file
+            filter_path: Path to filter file
 
         Returns:
-            Resume text content or fallback text
+            Filter text content or fallback text
         """
         try:
-            with open(resume_path, "r", encoding="utf-8") as f:
-                resume_text = f.read()
-            self.resume_text = resume_text
-            return resume_text
+            with open(filter_path, "r", encoding="utf-8") as f:
+                filter_text = f.read()
+            self.filter_text = filter_text
+            return filter_text
         except Exception as e:
-            self.logger.warning(f"⚠️ Failed to load resume: {e}")
-            # Fallback to short description
-            fallback_resume = """
-            Sales Manager with B2B experience.
-            
-            Experience:
-            - Active B2B sales (IT solutions, SaaS)
-            - Cold contacts and warm leads
-            - SPIN selling, objection handling
-            - CRM, Binotel, Bitrix24
-            
-            Looking for: Sales Manager position
-            Location: Remote
+            self.logger.warning(f"⚠️ Failed to load filter: {e}")
+            # Fallback to default filter in Ukrainian
+            fallback_filter = """
+            Я шукаю вакансії 'менеджер з продажу' або 'sales manager'.
+            Мінімальна зарплата: 25000 гривень.
+            Вакансії від ФОП чи без верифікації work.ua - не влаштовують.
+            Сумнівні фірми які займаються езотерикою чи торгують сумнівними товарами - не влаштовують.
             """
-            self.resume_text = fallback_resume
-            return fallback_resume
+            self.filter_text = fallback_filter
+            return fallback_filter
 
     async def analyze_job(
         self,
@@ -95,7 +94,7 @@ class LLMAnalysisService:
         salary: Optional[str],
         description: str,
     ) -> Tuple[bool, int, str]:
-        """Analyze if a job matches the candidate's profile
+        """Analyze if a job matches the user's filter criteria
 
         Args:
             job_title: Job title
@@ -162,10 +161,7 @@ class LLMAnalysisService:
         Returns:
             Formatted prompt string
         """
-        return f"""You are an HR assistant. Analyze if this job matches the candidate.
-
-CANDIDATE RESUME:
-{self.resume_text}
+        return f"""You are an HR assistant. Analyze this job posting.
 
 JOB POSTING:
 Title: {job_title}
@@ -175,7 +171,7 @@ Salary: {salary or 'Not specified'}
 Description: {description[:1000] if description else 'No description'}
 
 TASK:
-1. Rate the match from 1 to 10 (10 = perfect match)
+1. Rate the overall quality and clarity from 1 to 10 (10 = excellent job posting)
 2. Explain why
 
 RESPONSE FORMAT (JSON):
@@ -186,7 +182,7 @@ RESPONSE FORMAT (JSON):
 """
 
     async def analyze_job_match(self, job_description: str) -> Tuple[int, str]:
-        """Analyze job match probability with LLM
+        """Analyze job match probability with LLM based on user filter
 
         Args:
             job_description: Full job description text
@@ -198,23 +194,21 @@ RESPONSE FORMAT (JSON):
             return 50, "LLM analysis not available"
 
         try:
-            prompt = f"""Analyze how well my resume matches this job posting.
+            prompt = f"""Проаналізуй цю вакансію та оціни її якість та привабливість.
 
-MY RESUME:
-{self.resume_text}
-
-JOB DESCRIPTION:
+ОПИС ВАКАНСІЇ:
 {job_description}
 
-Provide your answer in the format:
-PROBABILITY: [number from 0 to 100]%
-EXPLANATION: [brief explanation why this probability]
+Дай відповідь у форматі:
+PROBABILITY: [число від 0 до 100]%
+EXPLANATION: [коротке пояснення чому така ймовірність]
 
-Consider:
-- Skills and experience match
-- Education requirements match
-- Language requirements match
-- Whether experience can compensate for missing formal requirements
+Врахуй:
+- Чіткість опису позиції та обов'язків
+- Чи вказана зарплата та чи вона конкурентна
+- Репутація та надійність компанії (верифікація, тип компанії)
+- Загальна привабливість пропозиції
+- Якість та повнота опису вакансії
 """
 
             response = await self.client.chat.completions.create(
@@ -222,7 +216,7 @@ Consider:
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are an HR expert and resume analyst.",
+                        "content": "Ти - експерт з аналізу вакансій. Відповідай українською мовою.",
                     },
                     {"role": "user", "content": prompt},
                 ],

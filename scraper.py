@@ -48,7 +48,7 @@ class WorkUAScraper:
         self.context = None
         self.is_logged_in = False
         self.applied_jobs = set()  # Множина URL вакансій на які вже відгукнулись
-        self.db = VacancyDatabase()  # База даних відгуків
+        self.db = VacancyDatabase.create()  # База даних відгуків (auto-detect CSV or Supabase)
         self.llm_service = LLMAnalysisService()  # LLM analysis service
 
         # Ініціалізація логера
@@ -56,10 +56,7 @@ class WorkUAScraper:
 
         # Load filter for LLM analysis (if any LLM feature is enabled)
         if self.llm_service.use_llm:
-            from llm_service import resolve_filter_path
-
-            filter_path = resolve_filter_path()
-            self.llm_service.load_filter(filter_path)
+            self.llm_service.load_filter()
 
     async def start(self, headless: bool = False):
         """Запустити браузер з stealth режимом та реалістичними налаштуваннями"""
@@ -144,14 +141,47 @@ class WorkUAScraper:
             with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(cookies, f, indent=2)
 
-    async def load_cookies(self, filepath: str = "cookies.json"):
-        """Завантажити cookies"""
+    async def load_cookies(self, filepath: str = "cookies.json") -> bool:
+        """Load cookies from environment variable or file
+
+        Args:
+            filepath: Path to cookies file (used if WORKUA_COOKIES env var is not set)
+
+        Returns:
+            True if cookies loaded successfully, False otherwise
+
+        Raises:
+            ValueError: If WORKUA_COOKIES is set but invalid (fatal in CI/CD)
+        """
+        # Priority 1: Load from environment variable
+        if config.WORKUA_COOKIES:
+            try:
+                self.logger.info("🍪 Loading cookies from WORKUA_COOKIES environment variable")
+                cookies = json.loads(config.WORKUA_COOKIES)
+                await self.context.add_cookies(cookies)
+                self.is_logged_in = True
+                return True
+            except Exception as e:
+                # If WORKUA_COOKIES is set but invalid, fail fast (don't fall back to phone login in CI)
+                raise ValueError(
+                    f"WORKUA_COOKIES is set but invalid: {e}. "
+                    "Fix the cookies JSON or remove the variable."
+                ) from e
+
+        # Priority 2: Load from file
         if os.path.exists(filepath):
-            with open(filepath, "r", encoding="utf-8") as f:
-                cookies = json.load(f)
-            await self.context.add_cookies(cookies)
-            self.is_logged_in = True
-            return True
+            try:
+                self.logger.info(f"🍪 Loading cookies from file: {filepath}")
+                with open(filepath, "r", encoding="utf-8") as f:
+                    cookies = json.load(f)
+                await self.context.add_cookies(cookies)
+                self.is_logged_in = True
+                return True
+            except Exception as e:
+                self.logger.warning(f"⚠️ Failed to load cookies from file: {e}")
+                return False
+
+        self.logger.info("ℹ️ No cookies found (neither in env var nor file)")
         return False
 
     async def check_login_status(self) -> bool:

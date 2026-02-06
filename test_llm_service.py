@@ -1,5 +1,6 @@
 """Unit tests for llm_service module"""
 
+import pytest
 from unittest.mock import Mock, AsyncMock, patch
 from llm_service import LLMAnalysisService
 
@@ -34,20 +35,28 @@ class TestLLMAnalysisService:
         filter_content = "Я шукаю вакансії 'Python Developer'. Мінімальна зарплата: 30000 грн."
         filter_file.write_text(filter_content, encoding="utf-8")
 
-        result = service.load_filter(str(filter_file))
+        # Mock config to use the temp filter file
+        with patch("llm_service.config") as mock_config:
+            mock_config.FILTER_CONTENT = None
+            mock_config.FILTER_PATH = str(filter_file)
 
-        assert result == filter_content
-        assert service.filter_text == filter_content
+            result = service.load_filter()
+
+            assert result == filter_content
+            assert service.filter_text == filter_content
 
     def test_load_filter_file_not_found(self):
-        """Test loading filter when file doesn't exist"""
+        """Test loading filter when file doesn't exist raises error"""
         service = LLMAnalysisService()
 
-        result = service.load_filter("nonexistent_file.txt")
+        # Mock config to use nonexistent file
+        with patch("llm_service.config") as mock_config:
+            mock_config.FILTER_CONTENT = None
+            mock_config.FILTER_PATH = "nonexistent_file.txt"
 
-        # Should return fallback filter
-        assert "менеджер з продажу" in result or "sales manager" in result
-        assert service.filter_text != ""
+            # Should raise FileNotFoundError instead of returning fallback
+            with pytest.raises(FileNotFoundError):
+                service.load_filter()
 
     async def test_analyze_job_brute_force_mode(self):
         """Test job analysis in brute force mode (no LLM)"""

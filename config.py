@@ -12,20 +12,19 @@ class Config:
 
     # API Keys
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
-    ANTHROPIC_API_KEY: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
 
     # Work.ua credentials
     WORKUA_PHONE: Optional[str] = os.getenv("WORKUA_PHONE")
+    WORKUA_COOKIES: Optional[str] = os.getenv("WORKUA_COOKIES")
 
     # Налаштування пошуку
-    FILTER_PATH: str = os.getenv("FILTER_PATH", "./my_filter.txt")
+    FILTER_PATH: Optional[str] = os.getenv("FILTER_PATH")
+    FILTER_CONTENT: Optional[str] = os.getenv("FILTER_CONTENT")
     SEARCH_KEYWORDS: list[str] = [
-        kw.strip()
-        for kw in os.getenv("SEARCH_KEYWORDS", "python developer").split(",")
-        if kw.strip()
+        kw.strip() for kw in os.getenv("SEARCH_KEYWORDS", "").split(",") if kw.strip()
     ]
     LOCATIONS: list[str] = [
-        loc.strip() for loc in os.getenv("LOCATIONS", "Київ").split(",") if loc.strip()
+        loc.strip() for loc in os.getenv("LOCATIONS", "").split(",") if loc.strip()
     ]
     REMOTE_ONLY: bool = os.getenv("REMOTE_ONLY", "false").lower() == "true"
     MIN_SALARY: int = int(
@@ -56,6 +55,10 @@ class Config:
     HEADLESS: bool = os.getenv("HEADLESS", "false").lower() == "true"
     BROWSER_TYPE: str = os.getenv("BROWSER_TYPE", "chromium")
 
+    # Supabase налаштування
+    SUPABASE_URL: Optional[str] = os.getenv("SUPABASE_URL")
+    SUPABASE_KEY: Optional[str] = os.getenv("SUPABASE_KEY")
+
     # URL
     WORKUA_BASE_URL: str = "https://www.work.ua"
     WORKUA_LOGIN_URL: str = "https://www.work.ua/ua/login/"
@@ -68,8 +71,35 @@ class Config:
     @classmethod
     def validate(cls) -> bool:
         """Перевірити чи є необхідні налаштування"""
-        if not cls.OPENAI_API_KEY:
-            raise ValueError("Потрібен OPENAI_API_KEY в .env файлі")
+        errors = []
+
+        # Check authentication: env vars or cookies.json file
+        cookies_file_exists = os.path.exists("cookies.json")
+        if not cls.WORKUA_PHONE and not cls.WORKUA_COOKIES and not cookies_file_exists:
+            errors.append("WORKUA_PHONE, WORKUA_COOKIES, or cookies.json is required")
+
+        if not cls.SEARCH_KEYWORDS:
+            errors.append("SEARCH_KEYWORDS is required")
+
+        # Ensure that either REMOTE_ONLY is enabled or at least one location is provided
+        if not cls.REMOTE_ONLY and not cls.LOCATIONS:
+            errors.append("LOCATIONS is required when REMOTE_ONLY is false")
+
+        # Check LLM-specific requirements
+        llm_enabled = cls.USE_LLM or cls.USE_PRE_APPLY_LLM_CHECK
+        if llm_enabled:
+            if not cls.OPENAI_API_KEY:
+                errors.append(
+                    "OPENAI_API_KEY is required when USE_LLM or USE_PRE_APPLY_LLM_CHECK is enabled"
+                )
+            if not cls.FILTER_PATH and not cls.FILTER_CONTENT:
+                errors.append(
+                    "FILTER_PATH or FILTER_CONTENT is required when USE_LLM or USE_PRE_APPLY_LLM_CHECK is enabled"
+                )
+
+        if errors:
+            raise ValueError("Configuration errors:\n  - " + "\n  - ".join(errors))
+
         return True
 
 

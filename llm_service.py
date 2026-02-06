@@ -9,29 +9,39 @@ from openai import AsyncOpenAI
 from config import config
 
 
-def resolve_filter_path() -> str:
-    """Resolve filter path with fallback to bundled filter
+def load_filter_content() -> str:
+    """Load filter content from environment variable or file
 
     Returns:
-        Path to filter file (configured or fallback)
+        Filter text content
+
+    Raises:
+        ValueError: If neither FILTER_CONTENT nor FILTER_PATH is configured
+        FileNotFoundError: If FILTER_PATH is configured but file doesn't exist
     """
-    filter_path = getattr(config, "FILTER_PATH", "./my_filter.txt")
-    if not os.path.exists(filter_path):
-        fallback_path = "filter_example.txt"
-        if os.path.exists(fallback_path):
-            logging.getLogger(__name__).warning(
-                "Configured filter path '%s' not found, using bundled '%s'",
-                filter_path,
-                fallback_path,
+    logger = logging.getLogger(__name__)
+
+    # Priority 1: Load from environment variable
+    if config.FILTER_CONTENT:
+        logger.info("✅ Loading filter from FILTER_CONTENT environment variable")
+        return config.FILTER_CONTENT
+
+    # Priority 2: Load from file
+    if config.FILTER_PATH:
+        if not os.path.exists(config.FILTER_PATH):
+            raise FileNotFoundError(
+                f"Filter file not found: {config.FILTER_PATH}. "
+                "Please provide FILTER_CONTENT environment variable or create the filter file."
             )
-            return fallback_path
-        else:
-            logging.getLogger(__name__).warning(
-                "Neither configured filter path '%s' nor fallback '%s' exist",
-                filter_path,
-                fallback_path,
-            )
-    return filter_path
+        logger.info(f"✅ Loading filter from file: {config.FILTER_PATH}")
+        with open(config.FILTER_PATH, "r", encoding="utf-8") as f:
+            return f.read()
+
+    # No filter configured
+    raise ValueError(
+        "Filter not configured. Please set FILTER_CONTENT environment variable "
+        "or FILTER_PATH to a valid filter file path."
+    )
 
 
 class LLMAnalysisService:
@@ -60,31 +70,20 @@ class LLMAnalysisService:
         else:
             self.logger.info("ℹ️ LLM analysis disabled - brute force mode")
 
-    def load_filter(self, filter_path: str) -> str:
-        """Load user filter from file
-
-        Args:
-            filter_path: Path to filter file
+    def load_filter(self) -> str:
+        """Load user filter from environment or file
 
         Returns:
-            Filter text content or fallback text
+            Filter text content
+
+        Raises:
+            ValueError: If filter is not configured
+            FileNotFoundError: If filter file doesn't exist
         """
-        try:
-            with open(filter_path, "r", encoding="utf-8") as f:
-                filter_text = f.read()
-            self.filter_text = filter_text
-            return filter_text
-        except Exception as e:
-            self.logger.warning(f"⚠️ Failed to load filter: {e}")
-            # Fallback to default filter in Ukrainian
-            fallback_filter = """
-            Я шукаю вакансії 'менеджер з продажу' або 'sales manager'.
-            Мінімальна зарплата: 25000 гривень.
-            Вакансії від ФОП чи без верифікації work.ua - не влаштовують.
-            Сумнівні фірми які займаються езотерикою чи торгують сумнівними товарами - не влаштовують.
-            """
-            self.filter_text = fallback_filter
-            return fallback_filter
+        filter_text = load_filter_content()
+        self.filter_text = filter_text
+        self.logger.info(f"✅ Filter loaded successfully ({len(filter_text)} characters)")
+        return filter_text
 
     async def analyze_job(
         self,
